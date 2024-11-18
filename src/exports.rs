@@ -102,7 +102,6 @@ pub extern "C" fn math_calculate_margin_requirement_and_total_collateral_and_lia
     let m = margin_calculation.map(|m| MarginCalculation {
         total_collateral: m.total_collateral.into(),
         margin_requirement: m.margin_requirement.into(),
-        all_oracles_valid: m.all_oracles_valid,
         with_perp_isolated_liability: m.with_perp_isolated_liability,
         with_spot_isolated_liability: m.with_spot_isolated_liability,
         total_spot_asset_value: m.total_spot_asset_value.into(),
@@ -130,8 +129,9 @@ pub extern "C" fn perp_market_get_margin_ratio(
     market: &PerpMarket,
     size: compat::u128,
     margin_type: MarginRequirementType,
+    high_leverage_mode: bool,
 ) -> FfiResult<u32> {
-    to_ffi_result(market.get_margin_ratio(size.0, margin_type))
+    to_ffi_result(market.get_margin_ratio(size.0, margin_type, high_leverage_mode))
 }
 
 #[no_mangle]
@@ -145,7 +145,7 @@ pub extern "C" fn perp_position_get_unrealized_pnl(
     oracle_price: i64,
 ) -> FfiResult<compat::i128> {
     to_ffi_result(position.get_unrealized_pnl(oracle_price).map(compat::i128))
-}
+} 
 
 #[no_mangle]
 pub extern "C" fn perp_position_is_available(position: &PerpPosition) -> bool {
@@ -193,6 +193,14 @@ pub extern "C" fn spot_market_get_liability_weight(
     margin_requirement_type: MarginRequirementType,
 ) -> FfiResult<u32> {
     to_ffi_result(market.get_liability_weight(size.0, &margin_requirement_type))
+}
+
+#[no_mangle]
+pub extern "C" fn spot_market_get_margin_ratio(
+    market: &SpotMarket,
+    margin_type: MarginRequirementType,
+) -> FfiResult<u32> {
+    to_ffi_result(market.get_margin_ratio(&margin_type))
 }
 
 #[no_mangle]

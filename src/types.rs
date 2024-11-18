@@ -76,12 +76,12 @@ impl From<MarginContextMode> for MarginContext {
     }
 }
 
+
 #[repr(C, align(16))]
 #[derive(Copy, Clone, Debug, PartialEq, TypeLayout)]
 pub struct MarginCalculation {
     pub total_collateral: compat::i128,
     pub margin_requirement: compat::u128,
-    pub all_oracles_valid: bool,
     pub with_perp_isolated_liability: bool,
     pub with_spot_isolated_liability: bool,
     pub total_spot_asset_value: compat::i128,
