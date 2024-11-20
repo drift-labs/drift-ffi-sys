@@ -76,7 +76,6 @@ impl From<MarginContextMode> for MarginContext {
     }
 }
 
-
 #[repr(C, align(16))]
 #[derive(Copy, Clone, Debug, PartialEq, TypeLayout)]
 pub struct MarginCalculation {

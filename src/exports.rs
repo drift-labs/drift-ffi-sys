@@ -1,6 +1,8 @@
 //!
 //! Define FFI for subset of drift program
 //!
+use std::time::{SystemTime, UNIX_EPOCH};
+
 use abi_stable::std_types::{
     ROption,
     RResult::{RErr, ROk},
@@ -10,14 +12,21 @@ use drift_program::{
     state::{
         oracle::{get_oracle_price as get_oracle_price_, OracleSource},
         oracle_map::OracleMap,
+        order_params::{OrderParams, PlaceOrderOptions},
         perp_market::{ContractType, PerpMarket},
         perp_market_map::PerpMarketMap,
         spot_market::SpotMarket,
         spot_market_map::SpotMarketMap,
+        state::State,
         user::{Order, PerpPosition, SpotPosition, User},
     },
 };
-use solana_sdk::{account::Account, account_info::IntoAccountInfo, clock::Slot, pubkey::Pubkey};
+use solana_sdk::{
+    account::Account,
+    account_info::IntoAccountInfo,
+    clock::{Clock, Slot},
+    pubkey::Pubkey,
+};
 
 use crate::types::{
     compat::{self},
@@ -115,6 +124,68 @@ pub extern "C" fn math_calculate_margin_requirement_and_total_collateral_and_lia
 }
 
 #[no_mangle]
+pub extern "C" fn orders_place_perp_order(
+    user: &User,
+    accounts: &mut AccountsList,
+    state: &State,
+    order_params: &OrderParams,
+) -> FfiResult<bool> {
+    let spot_accounts = accounts
+        .spot_markets
+        .iter_mut()
+        .map(IntoAccountInfo::into_account_info)
+        .collect::<Vec<_>>();
+    let spot_map =
+        SpotMarketMap::load(&Default::default(), &mut spot_accounts.iter().peekable()).unwrap();
+
+    let perp_accounts = accounts
+        .perp_markets
+        .iter_mut()
+        .map(IntoAccountInfo::into_account_info)
+        .collect::<Vec<_>>();
+    let perp_map =
+        PerpMarketMap::load(&Default::default(), &mut perp_accounts.iter().peekable()).unwrap();
+
+    let oracle_accounts = accounts
+        .oracles
+        .iter_mut()
+        .map(IntoAccountInfo::into_account_info)
+        .collect::<Vec<_>>();
+    let mut oracle_map = OracleMap::load(
+        &mut oracle_accounts.iter().peekable(),
+        accounts.latest_slot,
+        accounts.oracle_guard_rails,
+    )
+    .unwrap();
+
+    // has no epoch info but this is unrequired for orderplacement
+    let local_clock = Clock {
+        slot: accounts.latest_slot,
+        epoch_start_timestamp: 0,
+        epoch: 0,
+        leader_schedule_epoch: 0,
+        unix_timestamp: SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs() as i64,
+    };
+
+    let res = drift_program::controller::orders::place_perp_order(
+        state,
+        &mut user.clone(),
+        user.authority,
+        &perp_map,
+        &spot_map,
+        &mut oracle_map,
+        &local_clock,
+        *order_params,
+        PlaceOrderOptions::default(),
+    );
+
+    to_ffi_result(res.map(|_| true))
+}
+
+#[no_mangle]
 pub extern "C" fn order_is_limit_order(order: &Order) -> bool {
     order.is_limit_order()
 }
@@ -145,7 +216,7 @@ pub extern "C" fn perp_position_get_unrealized_pnl(
     oracle_price: i64,
 ) -> FfiResult<compat::i128> {
     to_ffi_result(position.get_unrealized_pnl(oracle_price).map(compat::i128))
-} 
+}
 
 #[no_mangle]
 pub extern "C" fn perp_position_is_available(position: &PerpPosition) -> bool {
