@@ -12,7 +12,7 @@ use drift_program::{
     state::{
         oracle::{get_oracle_price as get_oracle_price_, OracleSource},
         oracle_map::OracleMap,
-        order_params::{OrderParams, PlaceOrderOptions},
+        order_params::PlaceOrderOptions,
         perp_market::{ContractType, PerpMarket},
         perp_market_map::PerpMarketMap,
         spot_market::SpotMarket,
@@ -126,9 +126,9 @@ pub extern "C" fn math_calculate_margin_requirement_and_total_collateral_and_lia
 #[no_mangle]
 pub extern "C" fn orders_place_perp_order(
     user: &User,
-    accounts: &mut AccountsList,
     state: &State,
-    order_params: &OrderParams,
+    order_params: &crate::types::OrderParams,
+    accounts: &mut AccountsList,
 ) -> FfiResult<bool> {
     let spot_accounts = accounts
         .spot_markets
@@ -178,7 +178,25 @@ pub extern "C" fn orders_place_perp_order(
         &spot_map,
         &mut oracle_map,
         &local_clock,
-        *order_params,
+        drift_program::state::order_params::OrderParams {
+            order_type: order_params.order_type,
+            market_type: order_params.market_type,
+            direction: order_params.direction,
+            user_order_id: order_params.user_order_id,
+            base_asset_amount: order_params.base_asset_amount,
+            price: order_params.price,
+            market_index: order_params.market_index,
+            reduce_only: order_params.reduce_only,
+            post_only: order_params.post_only,
+            immediate_or_cancel: order_params.immediate_or_cancel,
+            max_ts: order_params.max_ts,
+            trigger_price: order_params.trigger_price,
+            trigger_condition: order_params.trigger_condition,
+            oracle_price_offset: order_params.oracle_price_offset,
+            auction_duration: order_params.auction_duration,
+            auction_start_price: order_params.auction_start_price,
+            auction_end_price: order_params.auction_end_price,
+        },
         PlaceOrderOptions::default(),
     );
 
