@@ -1,7 +1,7 @@
 name: Build
 
 on:
-  push:
+  pull_request:
     branches:
       - master
       - main
@@ -12,37 +12,21 @@ on:
       - ".github/workflows/*.yml"
 
 jobs:
-  publish-linux:
-    runs-on: ubuntu-latest
+  check:
+    runs-on: ubicloud
     timeout-minutes: 15
     steps:
       - name: Check out
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Install ffi toolchain (1.76.0)
         run: |
           rustup install 1.76.0-x86_64-unknown-linux-gnu
           rustup default 1.76.0-x86_64-unknown-linux-gnu
-      - name: Build Linux
+      - name: fmt
         run: |
-          cargo build --release
-      - uses: actions/upload-artifact@v4
-        with:
-          path: "target/release/libdrift_ffi_sys.so"
-          name: libdrift_ffi_sys.so
-  publish-mac:
-    runs-on: macos-latest
-    timeout-minutes: 15
-    steps:
-      - name: Check out
-        uses: actions/checkout@v2
-      - name: Install ffi toolchain (1.76.0)
+          cargo fmt --check
+      - name: build
         run: |
-          rustup install 1.76.0-x86_64-apple-darwin
-          rustup default 1.76.0-x86_64-apple-darwin
-      - name: Build Mac
-        run: |
-          cargo build --release
-      - uses: actions/upload-artifact@v4
-        with:
-          path: "target/release/libdrift_ffi_sys.dylib"
-          name: libdrift_ffi_sys.dylib
+          cargo check

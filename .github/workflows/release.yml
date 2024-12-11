@@ -1,0 +1,88 @@
+name: Build
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  create-release-preflight:
+    runs-on: ubicloud
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Check tag matches Cargo.toml version
+        run: |
+          TAG=${GITHUB_REF#refs/tags/v}
+          if [ "$TAG" != "${{ env.CARGO_VERSION }}" ]; then
+            echo "Error: Git tag ($TAG) does not match Cargo.toml version (${{ env.CARGO_VERSION }})"
+            exit 1
+          fi
+
+  publish-linux:
+    runs-on: ubicloud
+    needs: [create-release-preflight]
+    timeout-minutes: 15
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Install ffi toolchain (1.76.0)
+        run: |
+          rustup install 1.76.0-x86_64-unknown-linux-gnu
+          rustup default 1.76.0-x86_64-unknown-linux-gnu
+      - name: Build Linux
+        run: |
+          cargo build --release
+      - uses: actions/upload-artifact@v4
+        with:
+          path: "target/release/libdrift_ffi_sys.so"
+          name: libdrift_ffi_sys.so
+
+  publish-mac:
+    runs-on: macos-latest
+    needs: [create-release-preflight]
+    timeout-minutes: 15
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Install ffi toolchain (1.76.0)
+        run: |
+          rustup install 1.76.0-x86_64-apple-darwin
+          rustup default 1.76.0-x86_64-apple-darwin
+      - name: Build Mac
+        run: |
+          cargo build --release
+      - uses: actions/upload-artifact@v4
+        with:
+          path: "target/release/libdrift_ffi_sys.dylib"
+          name: libdrift_ffi_sys.dylib
+
+  create-release:
+    needs: [create-release-preflight, publish-linux, publish-mac]
+    runs-on: ubicloud
+    permissions:
+      contents: write
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Get version from Cargo.toml
+        run: |
+          echo "CARGO_VERSION=$(grep '^version = ' Cargo.toml | cut -d '"' -f2)" >> $GITHUB_ENV
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          name: v${{ env.CARGO_VERSION }}
+          files: |
+            libdrift_ffi_sys.so/libdrift_ffi_sys.so
+            libdrift_ffi_sys.dylib/libdrift_ffi_sys.dylib
+          generate_release_notes: true
