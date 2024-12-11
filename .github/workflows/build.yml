@@ -24,6 +24,7 @@ jobs:
         run: |
           rustup install 1.76.0-x86_64-unknown-linux-gnu
           rustup default 1.76.0-x86_64-unknown-linux-gnu
+          rustup component add rustfmt
       - name: fmt
         run: |
           cargo fmt --check
