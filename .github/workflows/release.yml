@@ -12,6 +12,10 @@ jobs:
       - name: Check out
         uses: actions/checkout@v4
 
+      - name: Get version from Cargo.toml
+        run: |
+          echo "CARGO_VERSION=$(grep '^version = ' Cargo.toml | cut -d '"' -f2)" >> $GITHUB_ENV
+
       - name: Check tag matches Cargo.toml version
         run: |
           TAG=${GITHUB_REF#refs/tags/v}
