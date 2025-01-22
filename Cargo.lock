@@ -1067,7 +1067,7 @@ dependencies = [
 
 [[package]]
 name = "drift-ffi-sys"
-version = "2.105.0"
+version = "2.107.0"
 dependencies = [
  "abi_stable",
  "drift",
