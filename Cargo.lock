@@ -578,7 +578,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4114279215a005bc675e386011e594e1d9b800918cea18fcadadcce864a2046b"
 dependencies = [
  "borsh-derive 0.10.3",
- "hashbrown 0.12.3",
+ "hashbrown 0.13.2",
 ]
 
 [[package]]
@@ -769,6 +769,12 @@ dependencies = [
  "libc",
  "shlex",
 ]
+
+[[package]]
+name = "cdylib-link-lines"
+version = "0.1.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d98eabef08bbdf5afd0b9c0cabb1ac335f7c70447ef095eed85dffd9628b20bc"
 
 [[package]]
 name = "cfg-if"
@@ -1070,6 +1076,7 @@ name = "drift-ffi-sys"
 version = "2.109.0"
 dependencies = [
  "abi_stable",
+ "cdylib-link-lines",
  "drift",
  "hex",
  "solana-sdk",

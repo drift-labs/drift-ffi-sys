@@ -15,3 +15,6 @@ drift-program = { package = "drift", git = "https://github.com/drift-labs/protoc
 hex = "*"
 solana-sdk = { version = "1.16.*" }
 type-layout = "*"
+
+[build-dependencies]
+cdylib-link-lines = "0.1"
