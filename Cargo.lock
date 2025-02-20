@@ -769,12 +769,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "cdylib-link-lines"
-version = "0.1.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d98eabef08bbdf5afd0b9c0cabb1ac335f7c70447ef095eed85dffd9628b20bc"
-
-[[package]]
 name = "cfg-if"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1027,8 +1021,8 @@ dependencies = [
 
 [[package]]
 name = "drift"
-version = "2.109.0"
-source = "git+https://github.com/drift-labs/protocol-v2.git?tag=v2.109.0#e99b9cd00b03136092749447af1b25a6880a9b4c"
+version = "2.110.0"
+source = "git+https://github.com/drift-labs/protocol-v2.git?tag=v2.110.0#184519370cd54931e475ab765853284cc028c90d"
 dependencies = [
  "ahash 0.8.6",
  "anchor-lang",
@@ -1062,12 +1056,10 @@ dependencies = [
 
 [[package]]
 name = "drift-ffi-sys"
-version = "2.109.1"
+version = "2.110.0"
 dependencies = [
  "abi_stable",
- "cdylib-link-lines",
  "drift",
- "hex",
  "solana-sdk",
 ]
 
@@ -1759,7 +1751,7 @@ checksum = "c08d65885ee38876c4f86fa503fb49d7b507c2b62552df7c70b2fce627e06381"
 [[package]]
 name = "openbook-v2-light"
 version = "0.1.0"
-source = "git+https://github.com/drift-labs/protocol-v2.git?tag=v2.109.0#e99b9cd00b03136092749447af1b25a6880a9b4c"
+source = "git+https://github.com/drift-labs/protocol-v2.git?tag=v2.110.0#184519370cd54931e475ab765853284cc028c90d"
 dependencies = [
  "anchor-lang",
  "borsh 0.10.3",
@@ -2918,7 +2910,7 @@ checksum = "6bdef32e8150c2a081110b42772ffe7d7c9032b606bc226c8260fd97e0976601"
 [[package]]
 name = "switchboard"
 version = "0.1.0"
-source = "git+https://github.com/drift-labs/protocol-v2.git?tag=v2.109.0#e99b9cd00b03136092749447af1b25a6880a9b4c"
+source = "git+https://github.com/drift-labs/protocol-v2.git?tag=v2.110.0#184519370cd54931e475ab765853284cc028c90d"
 dependencies = [
  "anchor-lang",
 ]
@@ -2926,7 +2918,7 @@ dependencies = [
 [[package]]
 name = "switchboard-on-demand"
 version = "0.1.0"
-source = "git+https://github.com/drift-labs/protocol-v2.git?tag=v2.109.0#e99b9cd00b03136092749447af1b25a6880a9b4c"
+source = "git+https://github.com/drift-labs/protocol-v2.git?tag=v2.110.0#184519370cd54931e475ab765853284cc028c90d"
 dependencies = [
  "anchor-lang",
  "bytemuck",
