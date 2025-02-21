@@ -1,0 +1,68 @@
+name: Bump program version
+on:
+  repository_dispatch:
+    types: ['sdk-update']
+
+jobs:
+  update-sdk:
+    runs-on: ubicloud
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Check update version
+      run: |
+        VERSION="${{ github.event.client_payload.version }}"
+        echo "IDL_VERSION=$VERSION" >> $GITHUB_ENV
+
+        # Check if version contains beta, alpha, or rc tags
+        if echo "$VERSION" | grep -qE "beta|alpha|rc"; then
+          echo "SKIP_PR=true" >> $GITHUB_ENV
+          echo "Skipping PR creation for pre-release version: $VERSION"
+        else
+          echo "SKIP_PR=false" >> $GITHUB_ENV
+        fi
+
+    - name: Update Cargo.toml
+      if: env.SKIP_PR == 'false'
+      run: |
+        if ! sed -i 's/^version = ".*"/version = "'$IDL_VERSION'"/' Cargo.toml; then
+          echo "Failed to update version in Cargo.toml"
+          exit 1
+        fi
+        
+        if ! grep "^version = \"$IDL_VERSION\"" Cargo.toml > /dev/null; then
+          echo "Version update verification failed"
+          exit 1
+        fi
+    
+        echo "Successfully updated version in Cargo.toml to $IDL_VERSION:"
+        grep "^version = " Cargo.toml
+
+    - name: Cargo check
+      if: env.SKIP_PR == 'false'
+      run: |
+        rustup install 1.76.0-x86_64-unknown-linux-gnu
+        rustup default 1.76.0-x86_64-unknown-linux-gnu
+        cargo -V
+        cargo check
+
+    - name: Create release commit+tag
+      if: env.SKIP_PR == 'false'
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        # Configure git
+        git config user.name "GitHub Actions"
+        git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+        # Make commit
+        git add -A
+        git commit -m "chore: bump program to v$IDL_VERSION 🤖"
+        git tag v$IDL_VERSION
+
+        git push origin master --tags
+        git push origin master
