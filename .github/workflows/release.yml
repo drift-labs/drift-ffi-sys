@@ -92,13 +92,3 @@ jobs:
             libdrift_ffi_sys.so/libdrift_ffi_sys.so
             libdrift_ffi_sys.dylib/libdrift_ffi_sys.dylib
           generate_release_notes: true
-
-      - name: Notify drift-rs
-        run: |
-          curl -L \
-            -X POST \
-            -H "Accept: application/vnd.github+json" \
-            -H "Authorization: Bearer ${{ secrets.REPO_DISPATCH_TOKEN }}" \
-            -H "X-GitHub-Api-Version: 2022-11-28" \
-            https://api.github.com/repos/drift-labs/drift-rs/dispatches \
-            -d "{\"event_type\":\"drift_ffi_update\",\"client_payload\":{\"drift_ffi_version\":\"$CARGO_VERSION\"}}"
