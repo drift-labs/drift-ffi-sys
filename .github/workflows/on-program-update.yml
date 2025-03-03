@@ -4,7 +4,7 @@ on:
     types: ['sdk-update']
 
 jobs:
-  update-sdk:
+  on-program-update:
     runs-on: ubicloud
     permissions:
       contents: write
@@ -33,7 +33,7 @@ jobs:
           echo "Failed to update version in Cargo.toml"
           exit 1
         fi
-        
+
         if ! grep "^version = \"$IDL_VERSION\"" Cargo.toml > /dev/null; then
           echo "Version update verification failed"
           exit 1
@@ -60,9 +60,9 @@ jobs:
         git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
         # Make commit
-        git add -A
+        git add -u
         git commit -m "chore: bump program to v$IDL_VERSION 🤖"
         git tag v$IDL_VERSION
 
-        git push origin master --tags
-        git push origin master
+        git push origin master --tags -f
+        git push origin master -f
