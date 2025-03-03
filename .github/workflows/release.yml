@@ -22,13 +22,16 @@ jobs:
         run: |
           echo "CARGO_VERSION=$(grep '^version = ' Cargo.toml | cut -d '"' -f2)" >> $GITHUB_ENV
 
-      - name: Check tag matches Cargo.toml version
+      # For tag trigger: Check that tag matches Cargo.toml version
+      - name: Validate tag match for tag trigger 
+        if: github.event_name == 'push'
         run: |
           TAG=${GITHUB_REF#refs/tags/v}
           if [ "$TAG" != "${{ env.CARGO_VERSION }}" ]; then
             echo "Error: Git tag ($TAG) does not match Cargo.toml version (${{ env.CARGO_VERSION }})"
             exit 1
           fi
+          echo "Tag validation successful"
 
   publish-linux:
     runs-on: ubicloud
