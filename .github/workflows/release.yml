@@ -1,9 +1,15 @@
 name: Build
 
 on:
+  # manual update
   push:
     tags:
       - 'v*'
+  # automated update
+  workflow_run:
+    workflows: ["Bump program version"]
+    types:
+      - completed
 
 jobs:
   create-release-preflight:
@@ -33,8 +39,7 @@ jobs:
     steps:
       - name: Check out
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+
       - name: Install ffi toolchain (1.76.0)
         run: |
           rustup install 1.76.0-x86_64-unknown-linux-gnu
@@ -54,8 +59,7 @@ jobs:
     steps:
       - name: Check out
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+
       - name: Install ffi toolchain (1.76.0)
         run: |
           rustup install 1.76.0-x86_64-apple-darwin

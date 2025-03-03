@@ -8,7 +8,6 @@ jobs:
     runs-on: ubicloud
     permissions:
       contents: write
-      pull-requests: write
     steps:
     - name: Checkout
       uses: actions/checkout@v4
@@ -29,7 +28,7 @@ jobs:
     - name: Update Cargo.toml
       if: env.SKIP_PR == 'false'
       run: |
-        if ! sed -i 's/^version = ".*"/version = "'$IDL_VERSION'"/' Cargo.toml; then
+        if ! sed -i 's/^version = ".*"/version = "'$IDL_VERSION'"/g' Cargo.toml; then
           echo "Failed to update version in Cargo.toml"
           exit 1
         fi
@@ -38,7 +37,7 @@ jobs:
           echo "Version update verification failed"
           exit 1
         fi
-    
+
         echo "Successfully updated version in Cargo.toml to $IDL_VERSION:"
         grep "^version = " Cargo.toml
 
@@ -62,7 +61,7 @@ jobs:
         # Make commit
         git add -u
         git commit -m "chore: bump program to v$IDL_VERSION 🤖"
-        git tag v$IDL_VERSION
+        git tag "v$IDL_VERSION"
 
         git push origin master --tags -f
         git push origin master -f
