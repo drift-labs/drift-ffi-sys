@@ -1,4 +1,4 @@
-name: Build
+name: Release
 
 on:
   # manual update
@@ -20,14 +20,12 @@ jobs:
 
       - name: Get version from Cargo.toml
         run: |
-          echo "
-          =$(grep '^version = ' Cargo.toml | cut -d '"' -f2)" >> $GITHUB_ENV
+          echo "CARGO_VERSION=$(grep '^version = ' Cargo.toml | cut -d '"' -f2)" >> $GITHUB_ENV
 
       - name: Check tag matches Cargo.toml version
         run: |
           TAG=${GITHUB_REF#refs/tags/v}
-          if [ "$TAG" != "${{ env.
-           }}" ]; then
+          if [ "$TAG" != "${{ env.CARGO_VERSION }}" ]; then
             echo "Error: Git tag ($TAG) does not match Cargo.toml version (${{ env.CARGO_VERSION }})"
             exit 1
           fi

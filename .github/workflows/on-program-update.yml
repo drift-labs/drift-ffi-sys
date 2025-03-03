@@ -60,7 +60,7 @@ jobs:
 
         # Make commit
         git add -u
-        git commit -m "chore: bump program to v$IDL_VERSION 🤖"
+        git commit -m "chore: bump program to v$IDL_VERSION 🤖" --allow-empty
         git tag "v$IDL_VERSION"
 
         git push origin master --tags -f
