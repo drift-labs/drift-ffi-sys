@@ -53,7 +53,7 @@ jobs:
         echo "Successfully updated version in Cargo.toml to $CRATE_VERSION:"
         grep "^version = " Cargo.toml
         echo "Successfully updated tag in Cargo.toml to $TAG_VERSION:"
-        grep "^tag = " Cargo.toml
+        grep "tag = " Cargo.toml
 
     - name: Cargo check
       if: env.SKIP_PR == 'false'
