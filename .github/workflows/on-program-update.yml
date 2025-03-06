@@ -28,12 +28,15 @@ jobs:
     - name: Update Cargo.toml
       if: env.SKIP_PR == 'false'
       run: |
+        # strip leading 'v'
+        TAG_VERSION=${IDL_VERSION#v}
+
         if ! sed -i 's/^version = ".*"/version = "'$IDL_VERSION'"/g' Cargo.toml; then
           echo "Failed to update version in Cargo.toml"
           exit 1
         fi
 
-        if ! sed -i 's/^tag = ".*"/tag = "v'$IDL_VERSION'"/g' Cargo.toml; then
+        if ! sed -i 's/^tag = ".*"/tag = "'TAG_VERSION'"/g' Cargo.toml; then
           echo "Failed to update tag in Cargo.toml"
           exit 1
         fi
