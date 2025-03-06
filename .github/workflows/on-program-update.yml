@@ -29,13 +29,13 @@ jobs:
     - name: Update Cargo.toml
       if: env.SKIP_PR == 'false'
       run: |
-        # Get IDL_VERSION from previous step
-        IDL_VERSION=${{ steps.check_version.outputs.idl_version }}
+        # Get idl_version from previous step
+        TAG_VERSION=${{ steps.check_version.outputs.idl_version }}
         
         # Strip leading 'v'
-        TAG_VERSION=${IDL_VERSION#v}
+        CRATE_VERSION=${TAG_VERSION#v}
 
-        if ! sed -i 's/^version = ".*"/version = "'$IDL_VERSION'"/g' Cargo.toml; then
+        if ! sed -i 's/^version = ".*"/version = "'$CRATE_VERSION'"/g' Cargo.toml; then
           echo "Failed to update version in Cargo.toml"
           exit 1
         fi
@@ -50,7 +50,7 @@ jobs:
           exit 1
         fi
 
-        echo "Successfully updated version in Cargo.toml to $IDL_VERSION:"
+        echo "Successfully updated version in Cargo.toml to $CRATE_VERSION:"
         grep "^version = " Cargo.toml
         echo "Successfully updated tag in Cargo.toml to $TAG_VERSION:"
         grep "^tag = " Cargo.toml
