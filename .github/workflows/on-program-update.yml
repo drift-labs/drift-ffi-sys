@@ -45,7 +45,7 @@ jobs:
           exit 1
         fi
 
-        if ! grep "^version = \"$IDL_VERSION\"" Cargo.toml > /dev/null; then
+        if ! grep "^version = \"$CRATE_VERSION\"" Cargo.toml > /dev/null; then
           echo "Version update verification failed"
           exit 1
         fi
