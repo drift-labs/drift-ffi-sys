@@ -54,7 +54,7 @@ jobs:
         grep "^version = " Cargo.toml
         echo "Successfully updated tag in Cargo.toml to $TAG_VERSION:"
         grep "^tag = " Cargo.toml
-        
+
         # Store IDL_VERSION for future steps
         echo "IDL_VERSION=$IDL_VERSION" >> $GITHUB_ENV
 
