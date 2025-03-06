@@ -40,7 +40,7 @@ jobs:
           exit 1
         fi
 
-        if ! sed -i 's/^tag = ".*"/tag = "'$TAG_VERSION'"/g' Cargo.toml; then
+        if ! sed -i 's/tag = ".*"/tag = "'$TAG_VERSION'"/g' Cargo.toml; then
           echo "Failed to update tag in Cargo.toml"
           exit 1
         fi
