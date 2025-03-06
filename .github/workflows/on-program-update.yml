@@ -13,6 +13,7 @@ jobs:
       uses: actions/checkout@v4
 
     - name: Check update version
+      id: check_version  # Added an ID to reference this step
       run: |
         VERSION=$(curl -s "https://api.github.com/repos/drift-labs/protocol-v2/tags" | grep -m 1 "name" | cut -d '"' -f 4)
         echo "idl_version=$VERSION" >> $GITHUB_OUTPUT
@@ -28,7 +29,10 @@ jobs:
     - name: Update Cargo.toml
       if: env.SKIP_PR == 'false'
       run: |
-        # strip leading 'v'
+        # Get IDL_VERSION from previous step
+        IDL_VERSION=${{ steps.check_version.outputs.idl_version }}
+        
+        # Strip leading 'v'
         TAG_VERSION=${IDL_VERSION#v}
 
         if ! sed -i 's/^version = ".*"/version = "'$IDL_VERSION'"/g' Cargo.toml; then
@@ -36,7 +40,7 @@ jobs:
           exit 1
         fi
 
-        if ! sed -i 's/^tag = ".*"/tag = "'TAG_VERSION'"/g' Cargo.toml; then
+        if ! sed -i 's/^tag = ".*"/tag = "'$TAG_VERSION'"/g' Cargo.toml; then
           echo "Failed to update tag in Cargo.toml"
           exit 1
         fi
@@ -48,6 +52,11 @@ jobs:
 
         echo "Successfully updated version in Cargo.toml to $IDL_VERSION:"
         grep "^version = " Cargo.toml
+        echo "Successfully updated tag in Cargo.toml to $TAG_VERSION:"
+        grep "^tag = " Cargo.toml
+        
+        # Store IDL_VERSION for future steps
+        echo "IDL_VERSION=$IDL_VERSION" >> $GITHUB_ENV
 
     - name: Cargo check
       if: env.SKIP_PR == 'false'
@@ -64,12 +73,4 @@ jobs:
       run: |
         # Configure git
         git config user.name "GitHub Actions"
-        git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-        # Make commit
-        git add -u
-        git commit -m "chore: bump program to $IDL_VERSION 🤖" --allow-empty
-        git tag "$IDL_VERSION"
-
-        git push origin master --tags -f
-        git push origin master -f
+        git config user.email "41898282+github-actions[bot]@users.nor

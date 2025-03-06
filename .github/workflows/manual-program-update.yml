@@ -1,12 +1,7 @@
-# Workflow to trigger manual update e.g incase of failed/missed workflow
-name: "Trigger IDL update"
+# Workflow to trigger manual latest program update e.g incase of failed/missed workflow
+name: "Trigger program update"
 on:
-  workflow_dispatch:
-    inputs:
-      version:
-        description: 'IDL version (e.g. 2.111.0)'
-        required: true
-        type: string
+  workflow_dispatch
 
 jobs:
   trigger-dispatch:
@@ -19,4 +14,4 @@ jobs:
         -H "Authorization: token ${{ secrets.GH_PAT }}" \
         -H "X-GitHub-Api-Version: 2022-11-28" \
         https://api.github.com/repos/drift-labs/drift-ffi-sys/dispatches \
-        -d '{"event_type":"sdk-update","client_payload":{"version":"${{ github.event.inputs.version }}"}}'
+        -d '{"event_type":"sdk-update","client_payload":{"version":"latest"}}'
