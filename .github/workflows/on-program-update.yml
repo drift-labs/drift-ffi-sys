@@ -55,9 +55,6 @@ jobs:
         echo "Successfully updated tag in Cargo.toml to $TAG_VERSION:"
         grep "^tag = " Cargo.toml
 
-        # Store IDL_VERSION for future steps
-        echo "IDL_VERSION=$IDL_VERSION" >> $GITHUB_ENV
-
     - name: Cargo check
       if: env.SKIP_PR == 'false'
       run: |
@@ -66,11 +63,16 @@ jobs:
         cargo -V
         cargo check
 
-    - name: Create release commit+tag
+    - name: Commit changes
       if: env.SKIP_PR == 'false'
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
         # Configure git
-        git config user.name "GitHub Actions"
-        git config user.email "41898282+github-actions[bot]@users.nor
+        git config --global user.name "GitHub Actions"
+        git config --global user.email "github-actions@github.com"
+
+        git add -u
+        git commit -m "chore: bump program to ${{ steps.check_version.outputs.idl_version }}"
+        git tag ${{ steps.check_version.outputs.idl_version }}
+        git push origin master
