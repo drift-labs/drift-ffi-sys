@@ -55,28 +55,8 @@ jobs:
           path: "target/release/libdrift_ffi_sys.so"
           name: libdrift_ffi_sys.so
 
-  publish-mac:
-    runs-on: macos-latest
-    needs: [create-release-preflight]
-    timeout-minutes: 15
-    steps:
-      - name: Check out
-        uses: actions/checkout@v4
-
-      - name: Install ffi toolchain (1.76.0)
-        run: |
-          rustup install 1.76.0-x86_64-apple-darwin
-          rustup default 1.76.0-x86_64-apple-darwin
-      - name: Build Mac
-        run: |
-          cargo build --release
-      - uses: actions/upload-artifact@v4
-        with:
-          path: "target/release/libdrift_ffi_sys.dylib"
-          name: libdrift_ffi_sys.dylib
-
   create-release:
-    needs: [create-release-preflight, publish-linux, publish-mac]
+    needs: [create-release-preflight, publish-linux]
     runs-on: ubicloud
     permissions:
       contents: write
