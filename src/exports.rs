@@ -218,8 +218,9 @@ pub extern "C" fn order_params_will_auction_params_sanitize(
     order_params: &mut OrderParams,
     perp_market: &PerpMarket,
     oracle_price: i64,
+    is_signed_msg: bool,
 ) -> FfiResult<bool> {
-    to_ffi_result(order_params.update_perp_auction_params(perp_market, oracle_price))
+    to_ffi_result(order_params.update_perp_auction_params(perp_market, oracle_price, is_signed_msg))
 }
 
 #[no_mangle]
