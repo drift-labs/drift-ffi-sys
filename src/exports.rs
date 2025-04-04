@@ -12,7 +12,7 @@ use drift_program::{
     state::{
         oracle::{get_oracle_price as get_oracle_price_, OracleSource},
         oracle_map::OracleMap,
-        order_params::PlaceOrderOptions,
+        order_params::{OrderParams, PlaceOrderOptions},
         perp_market::{ContractType, PerpMarket},
         perp_market_map::PerpMarketMap,
         spot_market::SpotMarket,
@@ -217,6 +217,16 @@ pub extern "C" fn order_is_limit_order(order: &Order) -> bool {
 #[no_mangle]
 pub extern "C" fn order_is_resting_limit_order(order: &Order, slot: u64) -> FfiResult<bool> {
     to_ffi_result(order.is_resting_limit_order(slot))
+}
+
+#[no_mangle]
+pub extern "C" fn order_params_will_auction_params_sanitize(
+    order_params: &mut OrderParams,
+    perp_market: &PerpMarket,
+    oracle_price: i64,
+    is_signed_msg: bool,
+) -> FfiResult<bool> {
+    to_ffi_result(order_params.update_perp_auction_params(perp_market, oracle_price, is_signed_msg))
 }
 
 #[no_mangle]
