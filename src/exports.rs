@@ -33,6 +33,12 @@ use crate::types::{
     AccountsList, FfiResult, MarginCalculation, MarginContextMode, OraclePriceData,
 };
 
+/// Return the FFI crate version
+#[no_mangle]
+pub extern "C" fn ffi_version() -> String {
+    env!("CARGO_PKG_VERSION").to_string()
+}
+
 #[no_mangle]
 pub extern "C" fn oracle_get_oracle_price(
     oracle_source: OracleSource,

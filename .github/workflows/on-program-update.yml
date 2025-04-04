@@ -1,0 +1,78 @@
+name: Bump program version
+on:
+  repository_dispatch:
+    types: ['sdk-update']
+
+jobs:
+  on-program-update:
+    runs-on: ubicloud
+    permissions:
+      contents: write
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Check update version
+      id: check_version  # Added an ID to reference this step
+      run: |
+        VERSION=$(curl -s "https://api.github.com/repos/drift-labs/protocol-v2/tags" | grep -m 1 "name" | cut -d '"' -f 4)
+        echo "idl_version=$VERSION" >> $GITHUB_OUTPUT
+
+        # Check if version contains beta, alpha, or rc tags
+        if echo "$VERSION" | grep -qE "beta|alpha|rc"; then
+          echo "SKIP_PR=true" >> $GITHUB_ENV
+          echo "Skipping PR creation for pre-release version: $VERSION"
+        else
+          echo "SKIP_PR=false" >> $GITHUB_ENV
+        fi
+
+    - name: Update Cargo.toml
+      if: env.SKIP_PR == 'false'
+      run: |
+        # Get idl_version from previous step
+        TAG_VERSION=${{ steps.check_version.outputs.idl_version }}
+        
+        # Strip leading 'v'
+        CRATE_VERSION=${TAG_VERSION#v}
+
+        if ! sed -i 's/^version = ".*"/version = "'$CRATE_VERSION'"/g' Cargo.toml; then
+          echo "Failed to update version in Cargo.toml"
+          exit 1
+        fi
+
+        if ! sed -i 's/tag = ".*"/tag = "'$TAG_VERSION'"/g' Cargo.toml; then
+          echo "Failed to update tag in Cargo.toml"
+          exit 1
+        fi
+
+        if ! grep "^version = \"$CRATE_VERSION\"" Cargo.toml > /dev/null; then
+          echo "Version update verification failed"
+          exit 1
+        fi
+
+        echo "Successfully updated version in Cargo.toml to $CRATE_VERSION:"
+        grep "^version = " Cargo.toml
+        echo "Successfully updated tag in Cargo.toml to $TAG_VERSION:"
+        grep "tag = " Cargo.toml
+
+    - name: Cargo check
+      if: env.SKIP_PR == 'false'
+      run: |
+        rustup install 1.76.0-x86_64-unknown-linux-gnu
+        rustup default 1.76.0-x86_64-unknown-linux-gnu
+        cargo -V
+        cargo check
+
+    - name: Commit changes
+      if: env.SKIP_PR == 'false'
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        # Configure git
+        git config --global user.name "GitHub Actions"
+        git config --global user.email "github-actions@github.com"
+
+        git add -u
+        git commit -m "chore: bump program to ${{ steps.check_version.outputs.idl_version }}"
+        git tag ${{ steps.check_version.outputs.idl_version }}
+        git push origin master

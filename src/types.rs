@@ -16,7 +16,6 @@ use solana_sdk::{
     clock::Slot,
     pubkey::Pubkey,
 };
-use type_layout::TypeLayout;
 
 #[repr(C)]
 #[derive(Debug)]
@@ -83,7 +82,7 @@ impl From<MarginContextMode> for MarginContext {
 }
 
 #[repr(C, align(16))]
-#[derive(Copy, Clone, Debug, PartialEq, TypeLayout)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct MarginCalculation {
     pub total_collateral: compat::i128,
     pub margin_requirement: compat::u128,
