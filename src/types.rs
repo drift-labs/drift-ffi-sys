@@ -117,7 +117,7 @@ pub struct OrderParams {
     pub market_index: u16,
     pub reduce_only: bool,
     pub post_only: PostOnlyParam,
-    pub immediate_or_cancel: bool,
+    pub bit_flags: u8,
     pub max_ts: Option<i64>,
     pub trigger_price: Option<u64>,
     pub trigger_condition: OrderTriggerCondition,
@@ -125,6 +125,30 @@ pub struct OrderParams {
     pub auction_duration: Option<u8>,     // specified in slots
     pub auction_start_price: Option<i64>, // specified in price or oracle_price_offset
     pub auction_end_price: Option<i64>,   // specified in price or oracle_price_offset
+}
+
+impl From<&OrderParams> for drift_program::state::order_params::OrderParams {
+    fn from(value: &OrderParams) -> Self {
+        Self {
+            order_type: value.order_type,
+            market_type: value.market_type,
+            direction: value.direction,
+            user_order_id: value.user_order_id,
+            base_asset_amount: value.base_asset_amount,
+            price: value.price,
+            market_index: value.market_index,
+            reduce_only: value.reduce_only,
+            post_only: value.post_only,
+            bit_flags: value.bit_flags,
+            max_ts: value.max_ts,
+            trigger_price: value.trigger_price,
+            trigger_condition: value.trigger_condition,
+            oracle_price_offset: value.oracle_price_offset,
+            auction_duration: value.auction_duration,
+            auction_start_price: value.auction_start_price,
+            auction_end_price: value.auction_end_price,
+        }
+    }
 }
 
 #[repr(C)]

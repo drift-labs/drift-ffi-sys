@@ -9,7 +9,7 @@ crate-type = ["cdylib"]
 
 [dependencies]
 abi_stable = { version = "0.11", default-features = false }
-drift-program = { package = "drift", git = "https://github.com/drift-labs/protocol-v2.git", tag = "v2.118.0", features = [
+drift-program = { package = "drift", git = "https://github.com/drift-labs/protocol-v2.git", tag = "v2.119.0", features = [
     "mainnet-beta", "drift-rs"
 ] }
 solana-sdk = { version = "1.16.*" }

@@ -12,7 +12,7 @@ use drift_program::{
     state::{
         oracle::{get_oracle_price as get_oracle_price_, OracleSource},
         oracle_map::OracleMap,
-        order_params::{OrderParams, PlaceOrderOptions},
+        order_params::PlaceOrderOptions,
         perp_market::{ContractType, PerpMarket},
         perp_market_map::PerpMarketMap,
         spot_market::SpotMarket,
@@ -164,7 +164,7 @@ pub extern "C" fn orders_place_perp_order(
     )
     .unwrap();
 
-    // has no epoch info but this is unrequired for orderplacement
+    // has no epoch info but this is un-required for order placement
     let local_clock = Clock {
         slot: accounts.latest_slot,
         epoch_start_timestamp: 0,
@@ -183,26 +183,9 @@ pub extern "C" fn orders_place_perp_order(
         &perp_map,
         &spot_map,
         &mut oracle_map,
+        &None, // TODO: pass through HLM config
         &local_clock,
-        drift_program::state::order_params::OrderParams {
-            order_type: order_params.order_type,
-            market_type: order_params.market_type,
-            direction: order_params.direction,
-            user_order_id: order_params.user_order_id,
-            base_asset_amount: order_params.base_asset_amount,
-            price: order_params.price,
-            market_index: order_params.market_index,
-            reduce_only: order_params.reduce_only,
-            post_only: order_params.post_only,
-            immediate_or_cancel: order_params.immediate_or_cancel,
-            max_ts: order_params.max_ts,
-            trigger_price: order_params.trigger_price,
-            trigger_condition: order_params.trigger_condition,
-            oracle_price_offset: order_params.oracle_price_offset,
-            auction_duration: order_params.auction_duration,
-            auction_start_price: order_params.auction_start_price,
-            auction_end_price: order_params.auction_end_price,
-        },
+        order_params.into(),
         PlaceOrderOptions::default(),
     );
 
@@ -221,11 +204,12 @@ pub extern "C" fn order_is_resting_limit_order(order: &Order, slot: u64) -> FfiR
 
 #[no_mangle]
 pub extern "C" fn order_params_will_auction_params_sanitize(
-    order_params: &mut OrderParams,
+    order_params: &crate::types::OrderParams,
     perp_market: &PerpMarket,
     oracle_price: i64,
     is_signed_msg: bool,
 ) -> FfiResult<bool> {
+    let mut order_params: drift_program::state::order_params::OrderParams = order_params.into();
     to_ffi_result(order_params.update_perp_auction_params(perp_market, oracle_price, is_signed_msg))
 }
 
