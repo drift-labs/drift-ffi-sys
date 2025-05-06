@@ -7,9 +7,11 @@ use abi_stable::std_types::{
     ROption,
     RResult::{RErr, ROk},
 };
+use anchor_lang::prelude::{AccountInfo, AccountLoader};
 use drift_program::{
     math::{self, margin::MarginRequirementType},
     state::{
+        high_leverage_mode_config::HighLeverageModeConfig,
         oracle::{get_oracle_price as get_oracle_price_, OracleSource},
         oracle_map::OracleMap,
         order_params::PlaceOrderOptions,
@@ -130,11 +132,12 @@ pub extern "C" fn math_calculate_margin_requirement_and_total_collateral_and_lia
 }
 
 #[no_mangle]
-pub extern "C" fn orders_place_perp_order(
+pub extern "C" fn orders_place_perp_order<'a>(
     user: &User,
     state: &State,
     order_params: &crate::types::OrderParams,
     accounts: &mut AccountsList,
+    high_leverage_mode_config: Option<&'a AccountInfo<'a>>,
 ) -> FfiResult<bool> {
     let spot_accounts = accounts
         .spot_markets
@@ -176,6 +179,8 @@ pub extern "C" fn orders_place_perp_order(
             .as_secs() as i64,
     };
 
+    let hlm_loader = high_leverage_mode_config
+        .map(|x| AccountLoader::try_from_unchecked(&drift_program::ID, x).unwrap());
     let res = drift_program::controller::orders::place_perp_order(
         state,
         &mut user.clone(),
@@ -183,7 +188,7 @@ pub extern "C" fn orders_place_perp_order(
         &perp_map,
         &spot_map,
         &mut oracle_map,
-        &None, // TODO: pass through HLM config
+        &hlm_loader,
         &local_clock,
         order_params.into(),
         PlaceOrderOptions::default(),
