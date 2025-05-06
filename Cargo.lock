@@ -1059,6 +1059,7 @@ name = "drift-ffi-sys"
 version = "2.120.0"
 dependencies = [
  "abi_stable",
+ "anchor-lang",
  "drift",
  "solana-sdk",
 ]
