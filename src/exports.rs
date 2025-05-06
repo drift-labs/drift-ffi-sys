@@ -11,7 +11,6 @@ use anchor_lang::prelude::{AccountInfo, AccountLoader};
 use drift_program::{
     math::{self, margin::MarginRequirementType},
     state::{
-        high_leverage_mode_config::HighLeverageModeConfig,
         oracle::{get_oracle_price as get_oracle_price_, OracleSource},
         oracle_map::OracleMap,
         order_params::PlaceOrderOptions,
