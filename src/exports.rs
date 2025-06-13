@@ -16,6 +16,7 @@ use drift_program::{
         order_params::PlaceOrderOptions,
         perp_market::{ContractType, PerpMarket},
         perp_market_map::PerpMarketMap,
+        protected_maker_mode_config::ProtectedMakerParams,
         spot_market::SpotMarket,
         spot_market_map::SpotMarketMap,
         state::State,
@@ -202,6 +203,26 @@ pub extern "C" fn order_is_limit_order(order: &Order) -> bool {
 }
 
 #[no_mangle]
+pub extern "C" fn order_get_limit_price(
+    order: &Order,
+    valid_oracle_price: Option<i64>,
+    fallback_price: Option<u64>,
+    slot: u64,
+    tick_size: u64,
+    is_prediction_market: bool,
+    pmm_params: Option<ProtectedMakerParams>,
+) -> FfiResult<Option<u64>> {
+    to_ffi_result(order.get_limit_price(
+        valid_oracle_price,
+        fallback_price,
+        slot,
+        tick_size,
+        is_prediction_market,
+        pmm_params,
+    ))
+}
+
+#[no_mangle]
 pub extern "C" fn order_is_resting_limit_order(order: &Order, slot: u64) -> FfiResult<bool> {
     to_ffi_result(order.is_resting_limit_order(slot))
 }
@@ -215,6 +236,13 @@ pub extern "C" fn order_params_will_auction_params_sanitize(
 ) -> FfiResult<bool> {
     let mut order_params: drift_program::state::order_params::OrderParams = order_params.into();
     to_ffi_result(order_params.update_perp_auction_params(perp_market, oracle_price, is_signed_msg))
+}
+
+#[no_mangle]
+pub extern "C" fn perp_market_get_protected_maker_params(
+    market: &PerpMarket,
+) -> ProtectedMakerParams {
+    market.get_protected_maker_params()
 }
 
 #[no_mangle]
