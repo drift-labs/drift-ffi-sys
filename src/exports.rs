@@ -16,6 +16,7 @@ use drift_program::{
         order_params::PlaceOrderOptions,
         perp_market::{ContractType, PerpMarket},
         perp_market_map::PerpMarketMap,
+        protected_maker_mode_config::ProtectedMakerParams,
         spot_market::SpotMarket,
         spot_market_map::SpotMarketMap,
         state::State,
@@ -199,6 +200,26 @@ pub extern "C" fn orders_place_perp_order<'a>(
 #[no_mangle]
 pub extern "C" fn order_is_limit_order(order: &Order) -> bool {
     order.is_limit_order()
+}
+
+#[no_mangle]
+pub extern "C" fn order_get_limit_price(
+    order: &Order,
+    valid_oracle_price: Option<i64>,
+    fallback_price: Option<u64>,
+    slot: u64,
+    tick_size: u64,
+    is_prediction_market: bool,
+    pmm_params: Option<ProtectedMakerParams>,
+) -> FfiResult<Option<u64>> {
+    to_ffi_result(order.get_limit_price(
+        valid_oracle_price,
+        fallback_price,
+        slot,
+        tick_size,
+        is_prediction_market,
+        pmm_params,
+    ))
 }
 
 #[no_mangle]
