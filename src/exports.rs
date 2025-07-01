@@ -198,6 +198,23 @@ pub extern "C" fn orders_place_perp_order<'a>(
 }
 
 #[no_mangle]
+pub extern "C" fn order_calculate_auction_params_for_trigger_order(
+    order: &Order,
+    oracle_price: &OraclePriceData,
+    perp_market: Option<&PerpMarket>,
+) -> FfiResult<(u8, i64, i64)> {
+    let oracle_price = unsafe { std::mem::transmute(oracle_price) };
+    to_ffi_result(
+        drift_program::math::auction::calculate_auction_params_for_trigger_order(
+            order,
+            oracle_price,
+            20,
+            perp_market,
+        ),
+    )
+}
+
+#[no_mangle]
 pub extern "C" fn order_is_limit_order(order: &Order) -> bool {
     order.is_limit_order()
 }
