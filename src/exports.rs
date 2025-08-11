@@ -278,6 +278,16 @@ pub extern "C" fn perp_market_get_open_interest(market: &PerpMarket) -> compat::
 }
 
 #[no_mangle]
+pub extern "C" fn perp_market_get_trigger_price(
+    market: &PerpMarket,
+    oracle_price: i64,
+    now: i64,
+    use_median_price: bool,
+) -> FfiResult<u64> {
+    to_ffi_result(market.get_trigger_price(oracle_price, now, use_median_price))
+}
+
+#[no_mangle]
 pub extern "C" fn perp_position_get_unrealized_pnl(
     position: &PerpPosition,
     oracle_price: i64,
