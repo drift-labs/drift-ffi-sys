@@ -285,19 +285,12 @@ pub extern "C" fn perp_market_get_mm_oracle_price_data(
     oracle_price_data: OraclePriceData,
     clock_slot: u64,
     oracle_guard_rails: &ValidityGuardRails,
-) -> FfiResult<crate::types::MMOraclePriceData> {
-    to_ffi_result(
-        market
-            .get_mm_oracle_price_data(oracle_price_data, clock_slot, oracle_guard_rails)
-            .map(|m| crate::types::MMOraclePriceData {
-                mm_oracle_price: m._get_mm_oracle_price(),
-                mm_oracle_delay: m.get_mm_oracle_delay(),
-                mm_oracle_validity: m.get_mm_oracle_validity(),
-                mm_exchange_diff_bps: m.get_mm_exchange_diff_bps().into(),
-                exchange_oracle_price_data: m.get_exchange_oracle_price_data(),
-                safe_oracle_price_data: m.get_safe_oracle_price_data(),
-            }),
-    )
+) -> FfiResult<MMOraclePriceData> {
+    to_ffi_result(market.get_mm_oracle_price_data(
+        oracle_price_data,
+        clock_slot,
+        oracle_guard_rails,
+    ))
 }
 
 #[no_mangle]

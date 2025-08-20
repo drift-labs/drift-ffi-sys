@@ -49,15 +49,6 @@ impl<'a> IntoAccountInfo<'a> for &'a mut AccountWithKey {
     }
 }
 
-pub struct MMOraclePriceData {
-    pub mm_oracle_price: i64,
-    pub mm_oracle_delay: i64,
-    pub mm_oracle_validity: OracleValidity,
-    pub mm_exchange_diff_bps: compat::u128,
-    pub exchange_oracle_price_data: OraclePriceData,
-    pub safe_oracle_price_data: OraclePriceData,
-}
-
 /// FFI equivalent of an `AccountMap`
 #[repr(C)]
 pub struct AccountsList<'a> {
