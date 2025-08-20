@@ -2,9 +2,10 @@
 use abi_stable::std_types::RResult;
 use drift_program::{
     controller::position::PositionDirection,
-    math::margin::MarginRequirementType,
+    math::{margin::MarginRequirementType, oracle::OracleValidity},
     state::{
         margin_calculation::MarginContext,
+        oracle::OraclePriceData,
         order_params::PostOnlyParam,
         state::OracleGuardRails,
         user::{MarketType, OrderTriggerCondition, OrderType},
@@ -149,15 +150,6 @@ impl From<&OrderParams> for drift_program::state::order_params::OrderParams {
             auction_end_price: value.auction_end_price,
         }
     }
-}
-
-#[repr(C)]
-#[derive(Default, Clone, Copy, Debug)]
-pub struct OraclePriceData {
-    pub price: i64,
-    pub confidence: u64,
-    pub delay: i64,
-    pub has_sufficient_number_of_data_points: bool,
 }
 
 /// C-ABI compatible result type for drift FFI calls

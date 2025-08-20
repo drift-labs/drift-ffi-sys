@@ -11,7 +11,9 @@ use anchor_lang::prelude::{AccountInfo, AccountLoader};
 use drift_program::{
     math::{self, margin::MarginRequirementType},
     state::{
-        oracle::{get_oracle_price as get_oracle_price_, OracleSource},
+        oracle::{
+            get_oracle_price as get_oracle_price_, MMOraclePriceData, OraclePriceData, OracleSource,
+        },
         oracle_map::OracleMap,
         order_params::PlaceOrderOptions,
         perp_market::{ContractType, PerpMarket},
@@ -19,7 +21,7 @@ use drift_program::{
         protected_maker_mode_config::ProtectedMakerParams,
         spot_market::SpotMarket,
         spot_market_map::SpotMarketMap,
-        state::State,
+        state::{State, ValidityGuardRails},
         user::{Order, PerpPosition, SpotPosition, User},
     },
 };
@@ -32,7 +34,7 @@ use solana_sdk::{
 
 use crate::types::{
     compat::{self},
-    AccountsList, FfiResult, MarginCalculation, MarginContextMode, OraclePriceData,
+    AccountsList, FfiResult, MarginCalculation, MarginContextMode,
 };
 
 /// Return the FFI crate version
@@ -275,6 +277,20 @@ pub extern "C" fn perp_market_get_margin_ratio(
 #[no_mangle]
 pub extern "C" fn perp_market_get_open_interest(market: &PerpMarket) -> compat::u128 {
     market.get_open_interest().into()
+}
+
+#[no_mangle]
+pub extern "C" fn perp_market_get_mm_oracle_price_data(
+    market: &PerpMarket,
+    oracle_price_data: OraclePriceData,
+    clock_slot: u64,
+    oracle_guard_rails: &ValidityGuardRails,
+) -> FfiResult<MMOraclePriceData> {
+    to_ffi_result(market.get_mm_oracle_price_data(
+        oracle_price_data,
+        clock_slot,
+        oracle_guard_rails,
+    ))
 }
 
 #[no_mangle]
