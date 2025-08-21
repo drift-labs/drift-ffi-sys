@@ -11,9 +11,7 @@ use anchor_lang::prelude::{AccountInfo, AccountLoader};
 use drift_program::{
     math::{self, margin::MarginRequirementType},
     state::{
-        oracle::{
-            get_oracle_price as get_oracle_price_, MMOraclePriceData, OraclePriceData, OracleSource,
-        },
+        oracle::{get_oracle_price as get_oracle_price_, OraclePriceData, OracleSource},
         oracle_map::OracleMap,
         order_params::PlaceOrderOptions,
         perp_market::{ContractType, PerpMarket},
@@ -34,7 +32,7 @@ use solana_sdk::{
 
 use crate::types::{
     compat::{self},
-    AccountsList, FfiResult, MarginCalculation, MarginContextMode,
+    AccountsList, FfiResult, MMOraclePriceData, MarginCalculation, MarginContextMode,
 };
 
 /// Return the FFI crate version
@@ -286,11 +284,19 @@ pub extern "C" fn perp_market_get_mm_oracle_price_data(
     clock_slot: u64,
     oracle_guard_rails: &ValidityGuardRails,
 ) -> FfiResult<MMOraclePriceData> {
-    to_ffi_result(market.get_mm_oracle_price_data(
-        oracle_price_data,
-        clock_slot,
-        oracle_guard_rails,
-    ))
+    to_ffi_result(
+        market
+            .get_mm_oracle_price_data(oracle_price_data, clock_slot, oracle_guard_rails)
+            .map(|m| MMOraclePriceData {
+                mm_oracle_price: m._get_mm_oracle_price(),
+                mm_oracle_delay: m.get_mm_oracle_delay(),
+                mm_oracle_validity: m.get_mm_oracle_validity(),
+                // the alignment of this u128 is different across the abi boundary
+                mm_exchange_diff_bps: m.get_mm_exchange_diff_bps().into(),
+                exchange_oracle_price_data: m.get_exchange_oracle_price_data(),
+                safe_oracle_price_data: m.get_safe_oracle_price_data(),
+            }),
+    )
 }
 
 #[no_mangle]

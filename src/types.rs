@@ -152,6 +152,16 @@ impl From<&OrderParams> for drift_program::state::order_params::OrderParams {
     }
 }
 
+/// `MMOraclePriceData` with aligned `mm_exchange_diff_bps` for abi compatibility
+pub struct MMOraclePriceData {
+    pub mm_oracle_price: i64,
+    pub mm_oracle_delay: i64,
+    pub mm_oracle_validity: OracleValidity,
+    pub mm_exchange_diff_bps: compat::u128,
+    pub exchange_oracle_price_data: OraclePriceData,
+    pub safe_oracle_price_data: OraclePriceData,
+}
+
 /// C-ABI compatible result type for drift FFI calls
 pub type FfiResult<T> = RResult<T, u32>;
 
