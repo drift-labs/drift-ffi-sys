@@ -338,15 +338,6 @@ pub extern "C" fn perp_position_worst_case_base_asset_amount(
 }
 
 #[no_mangle]
-pub extern "C" fn perp_position_simulate_settled_lp_position(
-    position: &PerpPosition,
-    market: &PerpMarket,
-    oracle_price: i64,
-) -> FfiResult<PerpPosition> {
-    to_ffi_result(position.simulate_settled_lp_position(market, oracle_price))
-}
-
-#[no_mangle]
 pub extern "C" fn spot_market_get_asset_weight(
     market: &SpotMarket,
     size: compat::u128,
