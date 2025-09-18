@@ -401,6 +401,15 @@ pub extern "C" fn user_get_perp_position(
     to_ffi_result(user.get_perp_position(market_index))
 }
 
+#[no_mangle]
+pub extern "C" fn user_update_perp_position_max_margin_ratio(
+    user: &mut User,
+    market_index: u16,
+    margin_ratio: u16,
+) -> FfiResult<()> {
+    to_ffi_result(user.update_perp_position_max_margin_ratio(market_index, max_margin_ratio))
+}
+
 //
 // Helpers
 //
