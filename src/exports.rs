@@ -407,7 +407,7 @@ pub extern "C" fn user_update_perp_position_max_margin_ratio(
     market_index: u16,
     margin_ratio: u16,
 ) -> FfiResult<()> {
-    to_ffi_result(user.update_perp_position_max_margin_ratio(market_index, max_margin_ratio))
+    to_ffi_result(user.update_perp_position_max_margin_ratio(market_index, margin_ratio))
 }
 
 //
