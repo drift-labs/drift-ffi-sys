@@ -203,7 +203,6 @@ pub extern "C" fn order_calculate_auction_params_for_trigger_order(
     oracle_price: &OraclePriceData,
     perp_market: Option<&PerpMarket>,
 ) -> FfiResult<(u8, i64, i64)> {
-    let oracle_price = unsafe { std::mem::transmute(oracle_price) };
     to_ffi_result(
         drift_program::math::auction::calculate_auction_params_for_trigger_order(
             order,
@@ -399,6 +398,15 @@ pub extern "C" fn user_get_perp_position(
     market_index: u16,
 ) -> FfiResult<&PerpPosition> {
     to_ffi_result(user.get_perp_position(market_index))
+}
+
+#[no_mangle]
+pub extern "C" fn user_update_perp_position_max_margin_ratio(
+    user: &mut User,
+    market_index: u16,
+    margin_ratio: u16,
+) -> FfiResult<()> {
+    to_ffi_result(user.update_perp_position_max_margin_ratio(market_index, margin_ratio))
 }
 
 //
