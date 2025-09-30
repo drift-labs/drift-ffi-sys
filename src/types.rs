@@ -7,6 +7,8 @@ use drift_program::{
         margin_calculation::MarginContext,
         oracle::OraclePriceData,
         order_params::PostOnlyParam,
+        perp_market::PerpMarket,
+        spot_market::SpotMarket,
         state::OracleGuardRails,
         user::{MarketType, OrderTriggerCondition, OrderType},
     },

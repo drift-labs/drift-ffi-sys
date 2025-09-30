@@ -30,3 +30,21 @@ ln -sf ./target/release/libdrift_ffi_sys.so /usr/lib #linux
 - for rust users this crate is intended to be linked via compiler flags (not Cargo dependency) as it compiles to a (platform dependent) dynamic lib (`.so/.dylib/.dll`)
 
 - can ignore most of the warnings for FFI safety. The main issue are types containing `u128`/`i128`s which are handled by a custom `compat::u128/i128` type that forces correct alignment where required.
+
+## Bump Program Version
+CI job does this automatically but occasionally fails due to breaking changes.
+
+1) checkout / pull master
+2) update `tag = "v2.140.0"` to the latest version in `Cargo.toml`
+
+```Cargo.toml
+drift-program = { package = "drift", git = "https://github.com/drift-labs/protocol-v2.git", tag = "v2.140.0", features = [
+    "mainnet-beta", "drift-rs"
+] }
+```
+
+3) update Cargo.toml to new version: `version = "vX.Y.Z"`
+
+4) `cargo check` and fix any compile issues
+
+5) git commit, `git tag -v vX.Y.Z` and push to release the new version

@@ -17,6 +17,7 @@ use drift_program::{
         perp_market::{ContractType, PerpMarket},
         perp_market_map::PerpMarketMap,
         protected_maker_mode_config::ProtectedMakerParams,
+        revenue_share::RevenueShareOrder,
         spot_market::SpotMarket,
         spot_market_map::SpotMarketMap,
         state::{State, ValidityGuardRails},
@@ -138,6 +139,7 @@ pub extern "C" fn orders_place_perp_order<'a>(
     order_params: &crate::types::OrderParams,
     accounts: &mut AccountsList,
     high_leverage_mode_config: Option<&'a AccountInfo<'a>>,
+    revenue_share_order: &mut Option<&'a mut RevenueShareOrder>,
 ) -> FfiResult<bool> {
     let spot_accounts = accounts
         .spot_markets
@@ -192,6 +194,7 @@ pub extern "C" fn orders_place_perp_order<'a>(
         &local_clock,
         order_params.into(),
         PlaceOrderOptions::default(),
+        revenue_share_order,
     );
 
     to_ffi_result(res.map(|_| true))
