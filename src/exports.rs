@@ -33,7 +33,8 @@ use solana_sdk::{
 
 use crate::types::{
     compat::{self},
-    AccountsList, FfiResult, MMOraclePriceData, MarginCalculation, MarginContextMode,
+    AccountsList, FfiMarketState, FfiResult, FfiSimplifiedMarginCalculation, MMOraclePriceData,
+    MarginCalculation, MarginContextMode,
 };
 
 /// Return the FFI crate version
@@ -410,6 +411,178 @@ pub extern "C" fn user_update_perp_position_max_margin_ratio(
     margin_ratio: u16,
 ) -> FfiResult<()> {
     to_ffi_result(user.update_perp_position_max_margin_ratio(market_index, margin_ratio))
+}
+
+// Simplified Margin Calculation FFI functions
+
+#[no_mangle]
+pub extern "C" fn ffi_market_state_new() -> *mut FfiMarketState {
+    let market_state = Box::new(crate::margin::HashMapMarketState::new());
+    let ffi_state = Box::new(FfiMarketState {
+        inner: Box::into_raw(market_state),
+    });
+    Box::into_raw(ffi_state)
+}
+
+#[no_mangle]
+pub extern "C" fn ffi_market_state_free(state: *mut FfiMarketState) {
+    if !state.is_null() {
+        unsafe {
+            let ffi_state = Box::from_raw(state);
+            if !ffi_state.inner.is_null() {
+                let _ = Box::from_raw(ffi_state.inner);
+            }
+        }
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn ffi_market_state_add_spot_market(
+    state: *mut FfiMarketState,
+    market: SpotMarket,
+) -> FfiResult<()> {
+    if state.is_null() {
+        return RErr(1); // Invalid pointer
+    }
+
+    unsafe {
+        let ffi_state = &mut *state;
+        if ffi_state.inner.is_null() {
+            return RErr(1); // Invalid inner pointer
+        }
+
+        let market_state = &mut *ffi_state.inner;
+        market_state.add_spot_market(market);
+        ROk(())
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn ffi_market_state_add_perp_market(
+    state: *mut FfiMarketState,
+    market: PerpMarket,
+) -> FfiResult<()> {
+    if state.is_null() {
+        return RErr(1); // Invalid pointer
+    }
+
+    unsafe {
+        let ffi_state = &mut *state;
+        if ffi_state.inner.is_null() {
+            return RErr(1); // Invalid inner pointer
+        }
+
+        let market_state = &mut *ffi_state.inner;
+        market_state.add_perp_market(market);
+        ROk(())
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn ffi_market_state_add_oracle_price(
+    state: *mut FfiMarketState,
+    market_index: u16,
+    price: OraclePriceData,
+) -> FfiResult<()> {
+    if state.is_null() {
+        return RErr(1); // Invalid pointer
+    }
+
+    unsafe {
+        let ffi_state = &mut *state;
+        if ffi_state.inner.is_null() {
+            return RErr(1); // Invalid inner pointer
+        }
+
+        let market_state = &mut *ffi_state.inner;
+        market_state.add_oracle_price(market_index, price);
+        ROk(())
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn ffi_market_state_add_quote_oracle_price(
+    state: *mut FfiMarketState,
+    market_index: u16,
+    price: OraclePriceData,
+) -> FfiResult<()> {
+    if state.is_null() {
+        return RErr(1); // Invalid pointer
+    }
+
+    unsafe {
+        let ffi_state = &mut *state;
+        if ffi_state.inner.is_null() {
+            return RErr(1); // Invalid inner pointer
+        }
+
+        let market_state = &mut *ffi_state.inner;
+        market_state.add_quote_oracle_price(market_index, price);
+        ROk(())
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn ffi_calculate_simplified_margin_requirement(
+    user: &User,
+    market_state: *const FfiMarketState,
+    margin_type: MarginRequirementType,
+) -> FfiResult<FfiSimplifiedMarginCalculation> {
+    if market_state.is_null() {
+        return RErr(1); // Invalid pointer
+    }
+
+    unsafe {
+        let ffi_state = &*market_state;
+        if ffi_state.inner.is_null() {
+            return RErr(1); // Invalid inner pointer
+        }
+
+        let market_state_ref = &*ffi_state.inner;
+        let result = crate::margin::calculate_simplified_margin_requirement(
+            user,
+            market_state_ref,
+            margin_type,
+        );
+
+        ROk(result.into())
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn ffi_calculate_simplified_margin_requirement_serialized(
+    user: &User,
+    market_data: &crate::types::FfiSerializedMarketData,
+    margin_type: MarginRequirementType,
+) -> FfiResult<FfiSimplifiedMarginCalculation> {
+    // Convert serialized data back to HashMapMarketState for calculation
+    let mut market_state = crate::margin::HashMapMarketState::new();
+
+    // Add spot markets
+    for spot_market in market_data.spot_markets {
+        market_state.add_spot_market(spot_market.clone());
+    }
+
+    // Add perp markets
+    for perp_market in market_data.perp_markets {
+        market_state.add_perp_market(perp_market.clone());
+    }
+
+    // Add oracle prices
+    for (market_index, price) in market_data.oracle_prices {
+        market_state.add_oracle_price(*market_index, price.clone());
+    }
+
+    // Add quote oracle prices
+    for (market_index, price) in market_data.quote_oracle_prices {
+        market_state.add_quote_oracle_price(*market_index, price.clone());
+    }
+
+    // Calculate margin requirement
+    let result =
+        crate::margin::calculate_simplified_margin_requirement(user, &market_state, margin_type);
+
+    ROk(result.into())
 }
 
 //

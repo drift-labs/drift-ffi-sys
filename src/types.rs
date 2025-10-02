@@ -19,6 +19,7 @@ use solana_sdk::{
     clock::Slot,
     pubkey::Pubkey,
 };
+use std::collections::HashMap;
 
 #[repr(C)]
 #[derive(Debug)]
@@ -166,6 +167,51 @@ pub struct MMOraclePriceData {
 
 /// C-ABI compatible result type for drift FFI calls
 pub type FfiResult<T> = RResult<T, u32>;
+
+/// FFI-compatible simplified margin calculation result
+#[repr(C)]
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub struct FfiSimplifiedMarginCalculation {
+    pub total_collateral: compat::i128,
+    pub margin_requirement: compat::u128,
+    pub free_collateral: compat::i128,
+    pub spot_asset_value: compat::u128,
+    pub spot_liability_value: compat::u128,
+    pub perp_pnl: compat::i128,
+    pub perp_liability_value: compat::u128,
+}
+
+impl From<crate::margin::SimplifiedMarginCalculation> for FfiSimplifiedMarginCalculation {
+    fn from(calc: crate::margin::SimplifiedMarginCalculation) -> Self {
+        Self {
+            total_collateral: calc.total_collateral.into(),
+            margin_requirement: calc.margin_requirement.into(),
+            free_collateral: calc.free_collateral.into(),
+            spot_asset_value: calc.spot_asset_value.into(),
+            spot_liability_value: calc.spot_liability_value.into(),
+            perp_pnl: calc.perp_pnl.into(),
+            perp_liability_value: calc.perp_liability_value.into(),
+        }
+    }
+}
+
+/// FFI-compatible market state for simplified margin calculations
+#[repr(C)]
+pub struct FfiMarketState {
+    // This will be a pointer to the actual HashMapMarketState implementation
+    // We'll use a raw pointer to avoid lifetime issues across FFI boundary
+    pub inner: *mut crate::margin::HashMapMarketState,
+}
+
+/// FFI-compatible serialized market data
+/// This avoids complex FFI struct management by passing simple data structures
+#[repr(C)]
+pub struct FfiSerializedMarketData<'a> {
+    pub spot_markets: &'a [SpotMarket],
+    pub perp_markets: &'a [PerpMarket],
+    pub oracle_prices: &'a HashMap<u16, OraclePriceData>,
+    pub quote_oracle_prices: &'a HashMap<u16, OraclePriceData>,
+}
 
 pub mod compat {
     //! ffi compatible input types
