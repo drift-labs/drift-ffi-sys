@@ -192,3 +192,32 @@ pub mod compat {
         }
     }
 }
+
+use crate::margin::GlobalMarketState;
+use std::collections::HashMap;
+
+/// Simple HashMap-based implementation of market state
+pub struct MarketState {
+    spot_markets: HashMap<u16, SpotMarket>,
+    perp_markets: HashMap<u16, PerpMarket>,
+    spot_oracle_prices: HashMap<u16, OraclePriceData>,
+    perp_oracle_prices: HashMap<u16, OraclePriceData>,
+}
+
+impl GlobalMarketState for MarketState {
+    fn get_spot_market(&self, market_index: u16) -> &SpotMarket {
+        self.spot_markets.get(&market_index).unwrap()
+    }
+
+    fn get_perp_market(&self, market_index: u16) -> &PerpMarket {
+        self.perp_markets.get(&market_index).unwrap()
+    }
+
+    fn get_spot_oracle_price(&self, market_index: u16) -> &OraclePriceData {
+        self.spot_oracle_prices.get(&market_index).unwrap()
+    }
+
+    fn get_perp_oracle_price(&self, market_index: u16) -> &OraclePriceData {
+        self.perp_oracle_prices.get(&market_index).unwrap()
+    }
+}

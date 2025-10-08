@@ -31,9 +31,10 @@ use solana_sdk::{
     pubkey::Pubkey,
 };
 
+use crate::margin::SimplifiedMarginCalculation;
 use crate::types::{
     compat::{self},
-    AccountsList, FfiResult, MMOraclePriceData, MarginCalculation, MarginContextMode,
+    AccountsList, FfiResult, MMOraclePriceData, MarginCalculation, MarginContextMode, MarketState,
 };
 
 /// Return the FFI crate version
@@ -410,6 +411,19 @@ pub extern "C" fn user_update_perp_position_max_margin_ratio(
     margin_ratio: u16,
 ) -> FfiResult<()> {
     to_ffi_result(user.update_perp_position_max_margin_ratio(market_index, margin_ratio))
+}
+
+#[no_mangle]
+pub extern "C" fn margin_calculate_simplified_margin_requirement(
+    user: &User,
+    market_state: &MarketState,
+    margin_type: MarginRequirementType,
+) -> FfiResult<SimplifiedMarginCalculation> {
+    FfiResult::ROk(crate::margin::calculate_simplified_margin_requirement(
+        user,
+        market_state,
+        margin_type,
+    ))
 }
 
 //
