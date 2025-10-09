@@ -197,6 +197,7 @@ use crate::margin::GlobalMarketState;
 use std::collections::HashMap;
 
 /// Simple HashMap-based implementation of market state
+#[derive(Default)]
 pub struct MarketState {
     spot_markets: HashMap<u16, SpotMarket>,
     perp_markets: HashMap<u16, PerpMarket>,
