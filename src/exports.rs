@@ -419,11 +419,10 @@ pub extern "C" fn margin_calculate_simplified_margin_requirement(
     market_state: &MarketState,
     margin_type: MarginRequirementType,
 ) -> FfiResult<SimplifiedMarginCalculation> {
-    FfiResult::ROk(crate::margin::calculate_simplified_margin_requirement(
-        user,
-        market_state,
-        margin_type,
-    ))
+    let result =
+        crate::margin::calculate_simplified_margin_requirement(user, market_state, margin_type);
+
+    FfiResult::ROk(result)
 }
 
 //

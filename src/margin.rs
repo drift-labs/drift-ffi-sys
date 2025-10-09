@@ -32,6 +32,7 @@ pub trait GlobalMarketState {
 }
 
 // Core margin calculation result
+#[repr(C, align(16))]
 #[derive(Debug, Clone)]
 pub struct SimplifiedMarginCalculation {
     pub total_collateral: i128,
