@@ -1,61 +1,50 @@
-# CachedMarginCalculation FFI
+# drift-ffi
 
-This crate now exposes `CachedMarginCalculation` over FFI, allowing consumers to initialize it with a User account and call `update_spot_position` and `update_perp_position` on it.
+Exposes C-ABI bindings for drift program.
 
-## Available FFI Functions
+Goals:
+1) Enable building SDKs that reuse program logic.  
+2) Separate rust SDK from program/solana runtime dependencies. Allows rust SDK to freely update to latest solana-* crates with bug fixes, improvements, etc.
 
-### Constructor
-- `cached_margin_calculation_from_user(user, market_state, margin_type, timestamp)` - Creates a new cached margin calculation from a user account
+<img src='./architecture.png'/>
 
-### Update Functions
-- `cached_margin_calculation_update_spot_position(cached, spot_position, market_state, timestamp)` - Updates the cached calculation with a spot position change
-- `cached_margin_calculation_update_perp_position(cached, perp_position, market_state, timestamp)` - Updates the cached calculation with a perp position change
+## Installation
 
-### Getter Functions
-- `cached_margin_calculation_get_total_collateral(cached)` - Returns total collateral
-- `cached_margin_calculation_get_margin_requirement(cached)` - Returns margin requirement
-- `cached_margin_calculation_get_free_collateral(cached)` - Returns free collateral
-- `cached_margin_calculation_get_spot_asset_value(cached)` - Returns spot asset value
-- `cached_margin_calculation_get_spot_liability_value(cached)` - Returns spot liability value
-- `cached_margin_calculation_get_perp_pnl(cached)` - Returns perp PnL
-- `cached_margin_calculation_get_perp_liability_value(cached)` - Returns perp liability value
+### Prebuilt
 
-## Usage Example
+Download latest [release libs](https://github.com/drift-labs/drift-ffi-sys/releases), unzip and link/copy to `/usr/lib` (linux) or `/usr/local/lib` (mac)
 
-```rust
-// Initialize cached margin calculation from user
-let cached = cached_margin_calculation_from_user(
-    &user,
-    &market_state,
-    MarginRequirementType::Initial,
-    timestamp
-)?;
+### from Source
+```shell
+rustup install 1.76.0-x86_64-apple-darwin # M1 mac
+rustup install 1.76.0-x86_64-unknown-linux-gnu # linux
 
-// Update with spot position changes
-cached_margin_calculation_update_spot_position(
-    &mut cached,
-    &spot_position,
-    &market_state,
-    timestamp
-)?;
+cargo build --release
+ln -sf ./target/release/libdrift_ffi_sys.dylib /usr/local/lib # mac
+ln -sf ./target/release/libdrift_ffi_sys.so /usr/lib #linux
+``` 
 
-// Update with perp position changes
-cached_margin_calculation_update_perp_position(
-    &mut cached,
-    &perp_position,
-    &market_state,
-    timestamp
-)?;
+## Developer Notes
+- this crate must be built with rust <= 1.76.0 to provide compatibility with onchain data layouts (later rust versions have breaking changes [128-bit integer C-abi compatibility](https://blog.rust-lang.org/2024/03/30/i128-layout-update.html))
 
-// Access calculated values
-let total_collateral = cached_margin_calculation_get_total_collateral(&cached);
-let margin_requirement = cached_margin_calculation_get_margin_requirement(&cached);
-let free_collateral = cached_margin_calculation_get_free_collateral(&cached);
+- for rust users this crate is intended to be linked via compiler flags (not Cargo dependency) as it compiles to a (platform dependent) dynamic lib (`.so/.dylib/.dll`)
+
+- can ignore most of the warnings for FFI safety. The main issue are types containing `u128`/`i128`s which are handled by a custom `compat::u128/i128` type that forces correct alignment where required.
+
+## Bump Program Version
+CI job does this automatically but occasionally fails due to breaking changes.
+
+1) checkout / pull master
+2) update `tag = "v2.140.0"` to the latest version in `Cargo.toml`
+
+```Cargo.toml
+drift-program = { package = "drift", git = "https://github.com/drift-labs/protocol-v2.git", tag = "v2.140.0", features = [
+    "mainnet-beta", "drift-rs"
+] }
 ```
 
-## Benefits
+3) update Cargo.toml to new version: `version = "vX.Y.Z"`
 
-- **Incremental Updates**: Only recalculate affected positions instead of full margin calculation
-- **Performance**: Significantly faster for frequent position updates
-- **Caching**: Maintains cached position contributions for efficient updates
-- **FFI Safe**: All types are properly aligned for C interop
+4) `cargo check` and fix any compile issues
+
+5) git commit, `git tag -v vX.Y.Z` and push to release the new version
