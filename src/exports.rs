@@ -31,7 +31,7 @@ use solana_sdk::{
     pubkey::Pubkey,
 };
 
-use crate::margin::SimplifiedMarginCalculation;
+use crate::margin::{CachedMarginCalculation, SimplifiedMarginCalculation};
 use crate::types::{
     compat::{self},
     AccountsList, FfiResult, MMOraclePriceData, MarginCalculation, MarginContextMode, MarketState,
@@ -423,6 +423,36 @@ pub extern "C" fn margin_calculate_simplified_margin_requirement(
         crate::margin::calculate_simplified_margin_requirement(user, market_state, margin_type);
 
     FfiResult::ROk(result)
+}
+
+#[no_mangle]
+pub extern "C" fn cached_margin_calculation_from_user(
+    user: &User,
+    market_state: &MarketState,
+    margin_type: MarginRequirementType,
+    timestamp: u64,
+) -> CachedMarginCalculation {
+    CachedMarginCalculation::from_user(user, market_state, margin_type, timestamp)
+}
+
+#[no_mangle]
+pub extern "C" fn cached_margin_calculation_update_spot_position(
+    cached: &mut CachedMarginCalculation,
+    spot_position: &SpotPosition,
+    market_state: &MarketState,
+    timestamp: u64,
+) {
+    cached.update_spot_position(spot_position, market_state, timestamp);
+}
+
+#[no_mangle]
+pub extern "C" fn cached_margin_calculation_update_perp_position(
+    cached: &mut CachedMarginCalculation,
+    perp_position: &PerpPosition,
+    market_state: &MarketState,
+    timestamp: u64,
+) {
+    cached.update_perp_position(perp_position, market_state, timestamp);
 }
 
 //
