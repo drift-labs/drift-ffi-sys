@@ -418,9 +418,14 @@ pub extern "C" fn margin_calculate_simplified_margin_requirement(
     user: &User,
     market_state: &MarketState,
     margin_type: MarginRequirementType,
+    margin_buffer: u32,
 ) -> FfiResult<SimplifiedMarginCalculation> {
-    let result =
-        crate::margin::calculate_simplified_margin_requirement(user, market_state, margin_type);
+    let result = crate::margin::calculate_simplified_margin_requirement(
+        user,
+        market_state,
+        margin_type,
+        margin_buffer,
+    );
 
     FfiResult::ROk(result)
 }
@@ -431,8 +436,9 @@ pub extern "C" fn cached_margin_calculation_from_user(
     market_state: &MarketState,
     margin_type: MarginRequirementType,
     timestamp: u64,
+    margin_buffer: u32,
 ) -> CachedMarginCalculation {
-    CachedMarginCalculation::from_user(user, market_state, margin_type, timestamp)
+    CachedMarginCalculation::from_user(user, market_state, margin_type, timestamp, margin_buffer)
 }
 
 #[no_mangle]
