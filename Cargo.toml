@@ -12,6 +12,8 @@ abi_stable = { version = "0.11", default-features = false }
 anchor-lang = "0.29.0"
 # commit `7c34e4` is v2.142.0 + removed some noisy println from ffi
 # change back to tag to fix CI
-drift-program = { package = "drift", git = "https://github.com/drift-labs/protocol-v2.git", rev = "7c34e4", features = ["mainnet-beta", "drift-rs"] }
+drift-program = { package = "drift", git = "https://github.com/drift-labs/protocol-v2.git", rev = "7c34e4", features = [
+    "mainnet-beta", "drift-rs"
+] }
 fxhash = "0.2.1"
 solana-sdk = { version = "1.16.*" }
