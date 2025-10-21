@@ -31,7 +31,7 @@ use solana_sdk::{
     pubkey::Pubkey,
 };
 
-use crate::margin::{CachedMarginCalculation, SimplifiedMarginCalculation};
+use crate::margin::{IncrementalMarginCalculation, SimplifiedMarginCalculation};
 use crate::types::{
     compat::{self},
     AccountsList, FfiResult, MMOraclePriceData, MarginCalculation, MarginContextMode, MarketState,
@@ -431,34 +431,40 @@ pub extern "C" fn margin_calculate_simplified_margin_requirement(
 }
 
 #[no_mangle]
-pub extern "C" fn cached_margin_calculation_from_user(
+pub extern "C" fn incremental_margin_calculation_from_user(
     user: &User,
     market_state: &MarketState,
     margin_type: MarginRequirementType,
     timestamp: u64,
     margin_buffer: u32,
-) -> CachedMarginCalculation {
-    CachedMarginCalculation::from_user(user, market_state, margin_type, timestamp, margin_buffer)
+) -> IncrementalMarginCalculation {
+    IncrementalMarginCalculation::from_user(
+        user,
+        market_state,
+        margin_type,
+        timestamp,
+        margin_buffer,
+    )
 }
 
 #[no_mangle]
-pub extern "C" fn cached_margin_calculation_update_spot_position(
-    cached: &mut CachedMarginCalculation,
+pub extern "C" fn incremental_margin_calculation_update_spot_position(
+    this: &mut IncrementalMarginCalculation,
     spot_position: &SpotPosition,
     market_state: &MarketState,
     timestamp: u64,
 ) {
-    cached.update_spot_position(spot_position, market_state, timestamp);
+    this.update_spot_position(spot_position, market_state, timestamp);
 }
 
 #[no_mangle]
-pub extern "C" fn cached_margin_calculation_update_perp_position(
-    cached: &mut CachedMarginCalculation,
+pub extern "C" fn incremental_margin_calculation_update_perp_position(
+    this: &mut IncrementalMarginCalculation,
     perp_position: &PerpPosition,
     market_state: &MarketState,
     timestamp: u64,
 ) {
-    cached.update_perp_position(perp_position, market_state, timestamp);
+    this.update_perp_position(perp_position, market_state, timestamp);
 }
 
 //

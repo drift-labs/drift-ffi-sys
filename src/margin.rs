@@ -9,18 +9,17 @@ use drift_program::{
     math::{
         constants::{
             MARGIN_PRECISION_I128, MARGIN_PRECISION_U128, OPEN_ORDER_MARGIN_REQUIREMENT,
-            PRICE_PRECISION_I64, QUOTE_SPOT_MARKET_INDEX,
+            QUOTE_SPOT_MARKET_INDEX,
         },
         margin::{calculate_perp_position_value_and_pnl, MarginRequirementType},
         spot_balance::get_strict_token_value,
     },
     state::{
-        oracle::{OraclePriceData, StrictOraclePrice},
+        oracle::StrictOraclePrice,
         spot_market::SpotBalanceType,
         user::{OrderFillSimulation, PerpPosition, SpotPosition, User},
     },
 };
-use solana_sdk::pubkey::Pubkey;
 
 // Core margin calculation result
 #[repr(C, align(16))]
@@ -85,19 +84,8 @@ pub fn calculate_simplified_margin_requirement(
         }
 
         let spot_market = market_state.get_spot_market(spot_position.market_index);
-        let oracle_price = if spot_market.oracle == Pubkey::default() {
-            &OraclePriceData {
-                price: PRICE_PRECISION_I64,
-                confidence: 1,
-                delay: 0,
-                has_sufficient_number_of_data_points: true,
-                sequence_id: None,
-            }
-        } else {
-            market_state.get_spot_oracle_price(spot_position.market_index)
-        };
+        let oracle_price = market_state.get_spot_oracle_price(spot_position.market_index);
 
-        // Get signed token amount
         let signed_token_amount = spot_position.get_signed_token_amount(spot_market).unwrap();
 
         let mut skip_token_value = false;
@@ -116,18 +104,18 @@ pub fn calculate_simplified_margin_requirement(
             );
 
             match spot_position.balance_type {
-                SpotBalanceType::Borrow => {
-                    let liability_value = token_value.unsigned_abs();
-                    margin_requirement += liability_value;
-                    margin_requirement_plus_buffer +=
-                        liability_value + (liability_value * margin_buffer) / MARGIN_PRECISION_U128;
-                }
                 SpotBalanceType::Deposit => {
                     // usdc deposit in pool 1 doesn't count
                     if skip_token_value {
                         token_value = 0;
                     }
                     total_collateral += token_value;
+                }
+                SpotBalanceType::Borrow => {
+                    let liability_value = token_value.unsigned_abs();
+                    margin_requirement += liability_value;
+                    margin_requirement_plus_buffer +=
+                        liability_value + (liability_value * margin_buffer) / MARGIN_PRECISION_U128;
                 }
             }
         } else {
@@ -191,51 +179,19 @@ pub fn calculate_simplified_margin_requirement(
         };
     }
 
-    // Process perp positions
-    let usdc_quote_oracle_data = market_state.get_spot_oracle_price(QUOTE_SPOT_MARKET_INDEX);
-    // in non-strict mode ignore twap
-    let usdc_strict_quote_price = StrictOraclePrice {
-        current: usdc_quote_oracle_data.price,
-        twap_5min: None,
-    };
-
     for perp_position in &user.perp_positions {
         if perp_position.is_available() {
             continue;
         }
 
         let perp_market = market_state.get_perp_market(perp_position.market_index);
-        let oracle_price = if perp_market.amm.oracle == Pubkey::default() {
-            &OraclePriceData {
-                price: PRICE_PRECISION_I64,
-                confidence: 1,
-                delay: 0,
-                has_sufficient_number_of_data_points: true,
-                sequence_id: None,
-            }
-        } else {
-            market_state.get_perp_oracle_price(perp_position.market_index)
-        };
+        let oracle_price = market_state.get_perp_oracle_price(perp_position.market_index);
 
-        let strict_quote_price = if perp_market.quote_spot_market_index == QUOTE_SPOT_MARKET_INDEX {
-            usdc_strict_quote_price
-        } else {
-            // non-usdc spot market
-            let spot_market = market_state.get_spot_market(perp_market.quote_spot_market_index);
-            let oracle_price_data = if spot_market.oracle == Pubkey::default() {
-                &OraclePriceData {
-                    price: PRICE_PRECISION_I64,
-                    confidence: 1,
-                    delay: 0,
-                    has_sufficient_number_of_data_points: true,
-                    sequence_id: None,
-                }
-            } else {
-                market_state.get_spot_oracle_price(perp_market.quote_spot_market_index)
-            };
-
+        let strict_quote_price = {
+            let quote_price_data =
+                market_state.get_spot_oracle_price(perp_market.quote_spot_market_index);
             StrictOraclePrice {
-                current: oracle_price_data.price,
+                current: quote_price_data.price,
                 twap_5min: None,
             }
         };
@@ -266,13 +222,10 @@ pub fn calculate_simplified_margin_requirement(
         .unwrap();
 
         margin_requirement += perp_margin_requirement;
-        total_collateral += weighted_pnl;
-
-        // Apply buffer to margin requirement
         margin_requirement_plus_buffer += perp_margin_requirement
             + (worst_case_liability_value * margin_buffer) / MARGIN_PRECISION_U128;
 
-        // Apply buffer to negative PnL (when it reduces collateral)
+        total_collateral += weighted_pnl;
         if weighted_pnl < 0 {
             total_collateral_buffer +=
                 (weighted_pnl * margin_buffer as i128) / MARGIN_PRECISION_I128;
@@ -287,10 +240,12 @@ pub fn calculate_simplified_margin_requirement(
     }
 }
 
-/// cached margin calculation
+/// Incremental margin calculation
+///
+/// Provides an alternative incremental API for calculating margin info
 #[repr(C, align(16))]
 #[derive(Debug, Clone)]
-pub struct CachedMarginCalculation {
+pub struct IncrementalMarginCalculation {
     pub total_collateral: i128,
     pub total_collateral_buffer: i128,
     pub margin_requirement: u128,
@@ -304,6 +259,7 @@ pub struct CachedMarginCalculation {
     pub margin_buffer: u32,
     pub margin_type: MarginRequirementType,
     pub user_high_leverage_mode: bool,
+    pub user_pool_id: u8,
 }
 
 /// position collateral contribution
@@ -318,14 +274,8 @@ pub struct PositionCollateral {
     pub market_index: u16,
 }
 
-// Incremental margin calculation functions
-impl CachedMarginCalculation {
-    pub fn new(
-        margin_type: MarginRequirementType,
-        user_high_leverage_mode: bool,
-        user_custom_margin_ratio: u32,
-        margin_buffer: u32,
-    ) -> Self {
+impl Default for IncrementalMarginCalculation {
+    fn default() -> Self {
         Self {
             total_collateral: 0,
             margin_requirement: 0,
@@ -334,10 +284,31 @@ impl CachedMarginCalculation {
             spot_collateral: Default::default(),
             perp_collateral: Default::default(),
             last_updated: 0,
+            margin_type: MarginRequirementType::Initial,
+            user_high_leverage_mode: false,
+            user_pool_id: 0,
+            user_custom_margin_ratio: 0,
+            margin_buffer: 0,
+        }
+    }
+}
+
+// Incremental margin calculation functions
+impl IncrementalMarginCalculation {
+    pub fn new(
+        margin_type: MarginRequirementType,
+        user_high_leverage_mode: bool,
+        user_custom_margin_ratio: u32,
+        margin_buffer: u32,
+        user_pool_id: u8,
+    ) -> Self {
+        Self {
             margin_type,
             user_high_leverage_mode,
             user_custom_margin_ratio,
             margin_buffer,
+            user_pool_id,
+            ..Default::default()
         }
     }
 
@@ -355,14 +326,15 @@ impl CachedMarginCalculation {
         } else {
             0_u32
         };
-        let mut cached = Self::new(
+        let mut this = Self::new(
             margin_type,
             user_high_leverage_mode,
             user_custom_margin_ratio,
             margin_buffer,
+            user.pool_id,
         );
-        cached.calculate(user, market_state, timestamp);
-        cached
+        this.calculate(user, market_state, timestamp);
+        this
     }
 
     pub fn free_collateral(&self) -> i128 {
@@ -434,6 +406,7 @@ impl CachedMarginCalculation {
                 self.user_custom_margin_ratio,
                 self.margin_buffer,
                 timestamp,
+                self.user_pool_id,
             );
 
             // Update the existing position in place
@@ -463,6 +436,7 @@ impl CachedMarginCalculation {
                 self.user_custom_margin_ratio,
                 self.margin_buffer,
                 timestamp,
+                self.user_pool_id,
             );
 
             // Add new contribution
@@ -564,7 +538,10 @@ impl CachedMarginCalculation {
 
 // Helper functions using existing Drift math utilities
 fn calculate_token_value(token_amount: i128, price: i64, decimals: u32) -> i128 {
-    let strict_price = StrictOraclePrice::new(price, price, false);
+    let strict_price = StrictOraclePrice {
+        current: price,
+        twap_5min: None,
+    };
     get_strict_token_value(token_amount, decimals, &strict_price).unwrap()
 }
 
@@ -580,6 +557,7 @@ fn calculate_spot_position_collateral(
     user_custom_margin_ratio: u32,
     margin_buffer: u32,
     timestamp: u64,
+    user_pool_id: u8,
 ) -> PositionCollateral {
     let margin_buffer = margin_buffer as u128;
     let spot_market = market_state.get_spot_market(spot_position.market_index);
@@ -598,16 +576,19 @@ fn calculate_spot_position_collateral(
     // Check if position has open orders - if not, use simple calculation
     let (worst_case_token_value, worst_case_weighted_token_value, worst_case_orders_value) =
         if spot_market.market_index == QUOTE_SPOT_MARKET_INDEX {
-            let token_value = get_strict_token_value(
+            let token_value = calculate_token_value(
                 signed_token_amount,
+                oracle_price.price,
                 spot_market.decimals,
-                &strict_oracle_price,
-            )
-            .unwrap();
-
-            (token_value, token_value, 0)
+            );
+            if !(user_pool_id == 1 && !spot_position.is_borrow()) {
+                (token_value, token_value, 0)
+            } else {
+                // usdc deposit in pool 1 doesn't count
+                (0, 0, 0)
+            }
         } else {
-            // Has open orders - use worst-case fill simulation
+            // non-usdc spot position
             let OrderFillSimulation {
                 token_amount: _worst_case_token_amount,
                 orders_value: worst_case_orders_value,
@@ -637,7 +618,6 @@ fn calculate_spot_position_collateral(
         };
 
     // Handle worst_case_token_value
-    let mut collateral_buffer = 0i128;
     let mut collateral_value = 0i128;
     let mut liability_value = 0u128;
     let mut liability_buffer = 0u128;
@@ -649,8 +629,7 @@ fn calculate_spot_position_collateral(
         Ordering::Less => {
             let liability = worst_case_weighted_token_value.unsigned_abs();
             liability_value += liability;
-            liability_buffer += liability
-                + (worst_case_token_value.unsigned_abs() * margin_buffer) / MARGIN_PRECISION_U128;
+            liability_buffer += liability + (liability * margin_buffer) / MARGIN_PRECISION_U128;
         }
         Ordering::Equal => {}
     }
@@ -670,15 +649,10 @@ fn calculate_spot_position_collateral(
     let open_order_margin = calculate_spot_open_order_margin(spot_position);
     liability_value += open_order_margin;
 
-    // Apply margin buffer to negative collateral
-    if collateral_value < 0 {
-        collateral_buffer += (collateral_value * margin_buffer as i128) / MARGIN_PRECISION_I128;
-    }
-
     PositionCollateral {
         market_index: spot_position.market_index,
         collateral_value,
-        collateral_buffer,
+        collateral_buffer: 0,
         liability_value,
         liability_buffer,
         last_updated: timestamp,
@@ -724,12 +698,11 @@ fn calculate_perp_position_collateral(
 
     // Calculate margin buffer
     let mut collateral_buffer = 0i128;
-    let mut liability_buffer = 0u128;
     let collateral_value = weighted_pnl;
     let liability_value = perp_margin_requirement;
 
     // Apply buffer to margin requirement
-    liability_buffer = liability_value
+    let liability_buffer = liability_value
         + (worst_case_liability_value * margin_buffer as u128) / MARGIN_PRECISION_U128;
 
     // Apply buffer to negative PnL (when it reduces collateral)
@@ -1039,7 +1012,7 @@ mod tests {
         );
 
         // Calculate initial cached margin
-        let mut cached = CachedMarginCalculation::from_user(
+        let mut cached = IncrementalMarginCalculation::from_user(
             &user,
             &market_state,
             MarginRequirementType::Initial,
@@ -1788,7 +1761,7 @@ mod tests {
         );
 
         // Calculate using cached method
-        let cached = CachedMarginCalculation::from_user(
+        let cached = IncrementalMarginCalculation::from_user(
             &user,
             &market_state,
             MarginRequirementType::Maintenance,
@@ -1805,7 +1778,7 @@ mod tests {
     #[test]
     fn test_simplified_vs_cached_with_spot_borrow() {
         // Test with spot borrow position
-        let (mut user, mut market_state) = create_simplified_test_setup();
+        let (mut user, market_state) = create_simplified_test_setup();
 
         // Add a borrow position
         user.spot_positions[1] = SpotPosition {
@@ -1823,7 +1796,7 @@ mod tests {
             0, // margin_buffer
         );
 
-        let cached = CachedMarginCalculation::from_user(
+        let cached = IncrementalMarginCalculation::from_user(
             &user,
             &market_state,
             MarginRequirementType::Maintenance,
@@ -1858,7 +1831,7 @@ mod tests {
             0, // margin_buffer
         );
 
-        let cached = CachedMarginCalculation::from_user(
+        let cached = IncrementalMarginCalculation::from_user(
             &user,
             &market_state,
             MarginRequirementType::Maintenance,
@@ -1875,7 +1848,7 @@ mod tests {
     #[test]
     fn test_simplified_vs_cached_with_open_orders() {
         // Test with open orders
-        let (mut user, market_state) = create_simplified_test_setup();
+        let (user, market_state) = create_simplified_test_setup();
 
         // Calculate using both methods
         let simplified = calculate_simplified_margin_requirement(
@@ -1885,7 +1858,7 @@ mod tests {
             0, // margin_buffer
         );
 
-        let cached = CachedMarginCalculation::from_user(
+        let cached = IncrementalMarginCalculation::from_user(
             &user,
             &market_state,
             MarginRequirementType::Maintenance,
@@ -1912,7 +1885,7 @@ mod tests {
             0, // margin_buffer
         );
 
-        let cached = CachedMarginCalculation::from_user(
+        let cached = IncrementalMarginCalculation::from_user(
             &user,
             &market_state,
             MarginRequirementType::Maintenance,
@@ -1939,7 +1912,7 @@ mod tests {
             0, // margin_buffer
         );
 
-        let cached = CachedMarginCalculation::from_user(
+        let cached = IncrementalMarginCalculation::from_user(
             &user,
             &market_state,
             MarginRequirementType::Maintenance,
@@ -1980,7 +1953,7 @@ mod tests {
             0, // margin_buffer
         );
 
-        let cached = CachedMarginCalculation::from_user(
+        let cached = IncrementalMarginCalculation::from_user(
             &user,
             &market_state,
             MarginRequirementType::Maintenance,

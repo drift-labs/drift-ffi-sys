@@ -199,10 +199,10 @@ pub mod compat {
 /// Simple HashMap-based implementation of market state
 #[derive(Default)]
 pub struct MarketState {
-    spot_markets: HashMap<u16, SpotMarket, FxBuildHasher>,
-    perp_markets: HashMap<u16, PerpMarket, FxBuildHasher>,
-    spot_oracle_prices: HashMap<u16, OraclePriceData, FxBuildHasher>,
-    perp_oracle_prices: HashMap<u16, OraclePriceData, FxBuildHasher>,
+    pub spot_markets: HashMap<u16, SpotMarket, FxBuildHasher>,
+    pub perp_markets: HashMap<u16, PerpMarket, FxBuildHasher>,
+    pub spot_oracle_prices: HashMap<u16, OraclePriceData, FxBuildHasher>,
+    pub perp_oracle_prices: HashMap<u16, OraclePriceData, FxBuildHasher>,
 }
 
 impl MarketState {
