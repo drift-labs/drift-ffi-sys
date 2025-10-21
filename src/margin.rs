@@ -274,6 +274,12 @@ pub struct PositionCollateral {
     pub market_index: u16,
 }
 
+impl PositionCollateral {
+    fn exists(&self) -> bool {
+        self.liability_value != 0 || self.collateral_value != 0 || self.last_updated > 0
+    }
+}
+
 impl Default for IncrementalMarginCalculation {
     fn default() -> Self {
         Self {
@@ -396,7 +402,7 @@ impl IncrementalMarginCalculation {
         if let Some(pos) = self
             .spot_collateral
             .iter()
-            .position(|c| c.market_index == spot_position.market_index && c.last_updated > 0)
+            .position(|c| c.market_index == spot_position.market_index && c.exists())
         {
             // Calculate new contribution and mutate in place
             let new_collateral = calculate_spot_position_collateral(
@@ -468,7 +474,7 @@ impl IncrementalMarginCalculation {
         if let Some(pos) = self
             .perp_collateral
             .iter()
-            .position(|c| c.market_index == perp_position.market_index && c.last_updated > 0)
+            .position(|c| c.market_index == perp_position.market_index && c.exists())
         {
             // Remove old contribution
             let old_collateral = &self.perp_collateral[pos];
@@ -509,10 +515,10 @@ impl IncrementalMarginCalculation {
             );
 
             // Add new contribution
-            self.total_collateral = new_collateral.collateral_value;
-            self.margin_requirement = new_collateral.liability_value;
-            self.total_collateral_buffer = new_collateral.collateral_buffer;
-            self.margin_requirement_plus_buffer = new_collateral.liability_buffer;
+            self.total_collateral += new_collateral.collateral_value;
+            self.margin_requirement += new_collateral.liability_value;
+            self.total_collateral_buffer += new_collateral.collateral_buffer;
+            self.margin_requirement_plus_buffer += new_collateral.liability_buffer;
 
             // insert position
             if let Some(idx) = self.perp_collateral.iter().position(|x| {
