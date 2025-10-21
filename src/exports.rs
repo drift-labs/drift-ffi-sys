@@ -31,9 +31,10 @@ use solana_sdk::{
     pubkey::Pubkey,
 };
 
+use crate::margin::{IncrementalMarginCalculation, SimplifiedMarginCalculation};
 use crate::types::{
     compat::{self},
-    AccountsList, FfiResult, MMOraclePriceData, MarginCalculation, MarginContextMode,
+    AccountsList, FfiResult, MMOraclePriceData, MarginCalculation, MarginContextMode, MarketState,
 };
 
 /// Return the FFI crate version
@@ -410,6 +411,60 @@ pub extern "C" fn user_update_perp_position_max_margin_ratio(
     margin_ratio: u16,
 ) -> FfiResult<()> {
     to_ffi_result(user.update_perp_position_max_margin_ratio(market_index, margin_ratio))
+}
+
+#[no_mangle]
+pub extern "C" fn margin_calculate_simplified_margin_requirement(
+    user: &User,
+    market_state: &MarketState,
+    margin_type: MarginRequirementType,
+    margin_buffer: u32,
+) -> FfiResult<SimplifiedMarginCalculation> {
+    let result = crate::margin::calculate_simplified_margin_requirement(
+        user,
+        market_state,
+        margin_type,
+        margin_buffer,
+    );
+
+    FfiResult::ROk(result)
+}
+
+#[no_mangle]
+pub extern "C" fn incremental_margin_calculation_from_user(
+    user: &User,
+    market_state: &MarketState,
+    margin_type: MarginRequirementType,
+    timestamp: u64,
+    margin_buffer: u32,
+) -> IncrementalMarginCalculation {
+    IncrementalMarginCalculation::from_user(
+        user,
+        market_state,
+        margin_type,
+        timestamp,
+        margin_buffer,
+    )
+}
+
+#[no_mangle]
+pub extern "C" fn incremental_margin_calculation_update_spot_position(
+    this: &mut IncrementalMarginCalculation,
+    spot_position: &SpotPosition,
+    market_state: &MarketState,
+    timestamp: u64,
+) {
+    this.update_spot_position(spot_position, market_state, timestamp);
+}
+
+#[no_mangle]
+pub extern "C" fn incremental_margin_calculation_update_perp_position(
+    this: &mut IncrementalMarginCalculation,
+    perp_position: &PerpPosition,
+    market_state: &MarketState,
+    timestamp: u64,
+) {
+    this.update_perp_position(perp_position, market_state, timestamp);
 }
 
 //

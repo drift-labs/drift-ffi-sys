@@ -1,4 +1,6 @@
 //! cross-boundary FFI types
+use std::collections::HashMap;
+
 use abi_stable::std_types::RResult;
 use drift_program::{
     controller::position::PositionDirection,
@@ -13,6 +15,7 @@ use drift_program::{
         user::{MarketType, OrderTriggerCondition, OrderType},
     },
 };
+use fxhash::FxBuildHasher;
 use solana_sdk::{
     account::Account,
     account_info::{Account as _, AccountInfo, IntoAccountInfo},
@@ -84,7 +87,7 @@ impl From<MarginContextMode> for MarginContext {
     }
 }
 
-#[repr(C, align(16))]
+#[repr(C)]
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct MarginCalculation {
     pub total_collateral: compat::i128,
@@ -190,5 +193,48 @@ pub mod compat {
         fn from(value: std::primitive::u128) -> Self {
             Self(value)
         }
+    }
+}
+
+/// Simple HashMap-based implementation of market state
+#[derive(Default)]
+pub struct MarketState {
+    pub spot_markets: HashMap<u16, SpotMarket, FxBuildHasher>,
+    pub perp_markets: HashMap<u16, PerpMarket, FxBuildHasher>,
+    pub spot_oracle_prices: HashMap<u16, OraclePriceData, FxBuildHasher>,
+    pub perp_oracle_prices: HashMap<u16, OraclePriceData, FxBuildHasher>,
+}
+
+impl MarketState {
+    pub fn get_spot_market(&self, market_index: u16) -> &SpotMarket {
+        self.spot_markets.get(&market_index).unwrap()
+    }
+
+    pub fn get_perp_market(&self, market_index: u16) -> &PerpMarket {
+        self.perp_markets.get(&market_index).unwrap()
+    }
+
+    pub fn get_spot_oracle_price(&self, market_index: u16) -> &OraclePriceData {
+        self.spot_oracle_prices.get(&market_index).unwrap()
+    }
+
+    pub fn get_perp_oracle_price(&self, market_index: u16) -> &OraclePriceData {
+        self.perp_oracle_prices.get(&market_index).unwrap()
+    }
+
+    pub fn set_spot_market(&mut self, market: SpotMarket) {
+        self.spot_markets.insert(market.market_index, market);
+    }
+
+    pub fn set_perp_market(&mut self, market: PerpMarket) {
+        self.perp_markets.insert(market.market_index, market);
+    }
+
+    pub fn set_spot_oracle_price(&mut self, market_index: u16, price_data: OraclePriceData) {
+        self.spot_oracle_prices.insert(market_index, price_data);
+    }
+
+    pub fn set_perp_oracle_price(&mut self, market_index: u16, price_data: OraclePriceData) {
+        self.perp_oracle_prices.insert(market_index, price_data);
     }
 }
