@@ -157,6 +157,30 @@ impl From<&OrderParams> for drift_program::state::order_params::OrderParams {
     }
 }
 
+impl From<&drift_program::state::order_params::OrderParams> for OrderParams {
+    fn from(value: &drift_program::state::order_params::OrderParams) -> Self {
+        Self {
+            order_type: value.order_type,
+            market_type: value.market_type,
+            direction: value.direction,
+            user_order_id: value.user_order_id,
+            base_asset_amount: value.base_asset_amount,
+            price: value.price,
+            market_index: value.market_index,
+            reduce_only: value.reduce_only,
+            post_only: value.post_only,
+            bit_flags: value.bit_flags,
+            max_ts: value.max_ts,
+            trigger_price: value.trigger_price,
+            trigger_condition: value.trigger_condition,
+            oracle_price_offset: value.oracle_price_offset,
+            auction_duration: value.auction_duration,
+            auction_start_price: value.auction_start_price,
+            auction_end_price: value.auction_end_price,
+        }
+    }
+}
+
 /// `MMOraclePriceData` with aligned `mm_exchange_diff_bps` for abi compatibility
 pub struct MMOraclePriceData {
     pub mm_oracle_price: i64,
