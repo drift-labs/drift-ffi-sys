@@ -260,15 +260,16 @@ pub extern "C" fn order_params_will_auction_params_sanitize(
 
 #[no_mangle]
 pub extern "C" fn order_params_update_perp_auction_params(
-    mut order_params: crate::types::OrderParams,
+    order_params: &mut crate::types::OrderParams,
     perp_market: &PerpMarket,
     oracle_price: i64,
     is_signed_msg: bool,
 ) {
+    // Convert to program type, update, then write back into the caller's struct
     let mut order_params_2: drift_program::state::order_params::OrderParams =
-        (&order_params).into();
+        (order_params as &crate::types::OrderParams).into();
     order_params_2.update_perp_auction_params(perp_market, oracle_price, is_signed_msg);
-    order_params = (&order_params_2).into();
+    *order_params = (&order_params_2).into();
 }
 
 #[no_mangle]
