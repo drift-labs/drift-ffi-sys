@@ -1,6 +1,6 @@
 [package]
 name = "drift-ffi-sys"
-version = "2.145.1"
+version = "2.146.0"
 edition = "2021"
 description = "FFI bindings to drift program"
 
@@ -10,7 +10,7 @@ crate-type = ["cdylib"]
 [dependencies]
 abi_stable = { version = "0.11", default-features = false }
 anchor-lang = "0.29.0"
-drift-program = { package = "drift", git = "https://github.com/drift-labs/protocol-v2.git", tag = "v2.145.1", features = [
+drift-program = { package = "drift", git = "https://github.com/drift-labs/protocol-v2.git", tag = "v2.146.0", features = [
     "mainnet-beta", "drift-rs"
 ] }
 fxhash = "0.2.1"
