@@ -9,7 +9,8 @@ use abi_stable::std_types::{
 };
 use anchor_lang::prelude::{AccountInfo, AccountLoader};
 use drift_program::{
-    math::{self, margin::MarginRequirementType},
+    controller::position::PositionDirection,
+    math::{self, amm::calculate_amm_available_liquidity, margin::MarginRequirementType},
     state::{
         oracle::{get_oracle_price as get_oracle_price_, OraclePriceData, OracleSource},
         oracle_map::OracleMap,
@@ -31,10 +32,13 @@ use solana_sdk::{
     pubkey::Pubkey,
 };
 
-use crate::margin::{IncrementalMarginCalculation, SimplifiedMarginCalculation};
-use crate::types::{
-    compat::{self},
-    AccountsList, FfiResult, MMOraclePriceData, MarginCalculation, MarginContextMode, MarketState,
+use crate::{
+    margin::{IncrementalMarginCalculation, SimplifiedMarginCalculation},
+    types::{
+        compat::{self},
+        AccountsList, FfiResult, MMOraclePriceData, MarginCalculation, MarginContextMode,
+        MarketState,
+    },
 };
 
 /// Return the FFI crate version
@@ -324,6 +328,24 @@ pub extern "C" fn perp_market_get_trigger_price(
     use_median_price: bool,
 ) -> FfiResult<u64> {
     to_ffi_result(market.get_trigger_price(oracle_price, now, use_median_price))
+}
+
+#[no_mangle]
+pub extern "C" fn perp_market_get_fallback_price(
+    market: &PerpMarket,
+    direction: PositionDirection,
+    oracle_price: i64,
+    seconds_til_order_expiry: i64,
+) -> FfiResult<u64> {
+    let res = match calculate_amm_available_liquidity(&market.amm, &direction) {
+        Ok(liq) => {
+            market
+                .amm
+                .get_fallback_price(&direction, liq, oracle_price, seconds_til_order_expiry)
+        }
+        Err(err) => Err(err),
+    };
+    to_ffi_result(res)
 }
 
 #[no_mangle]

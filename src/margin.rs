@@ -2,9 +2,6 @@
 
 use std::cmp::Ordering;
 
-// This is a mathematical abstraction of the Drift Protocol margin system
-// Reuses existing type definitions while removing Solana-specific abstractions
-use crate::types::MarketState;
 use drift_program::{
     math::{
         constants::{
@@ -20,6 +17,10 @@ use drift_program::{
         user::{OrderFillSimulation, PerpPosition, SpotPosition, User},
     },
 };
+
+// This is a mathematical abstraction of the Drift Protocol margin system
+// Reuses existing type definitions while removing Solana-specific abstractions
+use crate::types::MarketState;
 
 // Core margin calculation result
 #[repr(C, align(16))]
