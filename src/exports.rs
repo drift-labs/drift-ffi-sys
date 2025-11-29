@@ -37,7 +37,7 @@ use crate::{
     types::{
         compat::{self},
         AccountsList, FfiResult, MMOraclePriceData, MarginCalculation, MarginContextMode,
-        MarketState,
+        MarketState, PerpPriceOverrides,
     },
 };
 
@@ -461,6 +461,25 @@ pub extern "C" fn margin_calculate_simplified_margin_requirement(
         market_state,
         margin_type,
         margin_buffer,
+    );
+
+    FfiResult::ROk(result)
+}
+
+#[no_mangle]
+pub extern "C" fn margin_calculate_simplified_margin_requirement_with_overrides(
+    user: &User,
+    market_state: &MarketState,
+    margin_type: MarginRequirementType,
+    margin_buffer: u32,
+    perp_pyth_price_overrides: Option<&PerpPriceOverrides>,
+) -> FfiResult<SimplifiedMarginCalculation> {
+    let result = crate::margin::calculate_simplified_margin_requirement_with_overrides(
+        user,
+        market_state,
+        margin_type,
+        margin_buffer,
+        perp_pyth_price_overrides,
     );
 
     FfiResult::ROk(result)
