@@ -262,3 +262,6 @@ impl MarketState {
         self.perp_oracle_prices.insert(market_index, price_data);
     }
 }
+
+/// Market Index -> Price
+pub type PerpPriceOverrides = HashMap<u16, u64>;

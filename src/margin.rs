@@ -12,7 +12,7 @@ use drift_program::{
         spot_balance::get_strict_token_value,
     },
     state::{
-        oracle::StrictOraclePrice,
+        oracle::{OraclePriceData, StrictOraclePrice},
         spot_market::SpotBalanceType,
         user::{OrderFillSimulation, PerpPosition, SpotPosition, User},
     },
@@ -20,7 +20,7 @@ use drift_program::{
 
 // This is a mathematical abstraction of the Drift Protocol margin system
 // Reuses existing type definitions while removing Solana-specific abstractions
-use crate::types::MarketState;
+use crate::types::{MarketState, PerpPriceOverrides};
 
 // Core margin calculation result
 #[repr(C, align(16))]
@@ -63,6 +63,22 @@ pub fn calculate_simplified_margin_requirement(
     market_state: &MarketState,
     margin_type: MarginRequirementType,
     margin_buffer: u32,
+) -> SimplifiedMarginCalculation {
+    calculate_simplified_margin_requirement_with_overrides(
+        user,
+        market_state,
+        margin_type,
+        margin_buffer,
+        None,
+    )
+}
+
+pub fn calculate_simplified_margin_requirement_with_overrides(
+    user: &User,
+    market_state: &MarketState,
+    margin_type: MarginRequirementType,
+    margin_buffer: u32,
+    perp_pyth_price_overrides: Option<&PerpPriceOverrides>,
 ) -> SimplifiedMarginCalculation {
     let user_high_leverage_mode = user.is_high_leverage_mode(margin_type);
     let mut total_collateral = 0i128;
@@ -186,7 +202,16 @@ pub fn calculate_simplified_margin_requirement(
         }
 
         let perp_market = market_state.get_perp_market(perp_position.market_index);
-        let oracle_price = market_state.get_perp_oracle_price(perp_position.market_index);
+        let oracle_price = perp_pyth_price_overrides
+            .and_then(|map| map.get(&perp_position.market_index))
+            .map(|&price| OraclePriceData {
+                price: price as i64,
+                confidence: 0,
+                delay: 0,
+                has_sufficient_number_of_data_points: true,
+                sequence_id: None,
+            })
+            .unwrap_or_else(|| *market_state.get_perp_oracle_price(perp_position.market_index));
 
         let strict_quote_price = {
             let quote_price_data =
@@ -213,7 +238,7 @@ pub fn calculate_simplified_margin_requirement(
         ) = calculate_perp_position_value_and_pnl(
             perp_position,
             perp_market,
-            oracle_price,
+            &oracle_price,
             &strict_quote_price,
             margin_type,
             user_custom_margin_ratio.max(perp_position_custom_margin_ratio),
