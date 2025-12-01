@@ -227,6 +227,7 @@ pub struct MarketState {
     pub perp_markets: HashMap<u16, PerpMarket, FxBuildHasher>,
     pub spot_oracle_prices: HashMap<u16, OraclePriceData, FxBuildHasher>,
     pub perp_oracle_prices: HashMap<u16, OraclePriceData, FxBuildHasher>,
+    pub perp_pyth_prices: HashMap<u16, i64, FxBuildHasher>, // Override with pyth price
 }
 
 impl MarketState {
@@ -246,6 +247,18 @@ impl MarketState {
         self.perp_oracle_prices.get(&market_index).unwrap()
     }
 
+    pub fn get_perp_pyth_price(&self, market_index: u16) -> Option<OraclePriceData> {
+        self.perp_pyth_prices
+            .get(&market_index)
+            .map(|&price| OraclePriceData {
+                price,
+                confidence: 0,
+                delay: 0,
+                has_sufficient_number_of_data_points: true,
+                sequence_id: None,
+            })
+    }
+
     pub fn set_spot_market(&mut self, market: SpotMarket) {
         self.spot_markets.insert(market.market_index, market);
     }
@@ -261,7 +274,8 @@ impl MarketState {
     pub fn set_perp_oracle_price(&mut self, market_index: u16, price_data: OraclePriceData) {
         self.perp_oracle_prices.insert(market_index, price_data);
     }
-}
 
-/// Market Index -> Price
-pub type PerpPriceOverrides = HashMap<u16, u64>;
+    pub fn set_perp_pyth_price(&mut self, market_index: u16, price_data: i64) {
+        self.perp_pyth_prices.insert(market_index, price_data);
+    }
+}
