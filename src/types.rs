@@ -227,6 +227,9 @@ pub struct MarketState {
     pub perp_markets: HashMap<u16, PerpMarket, FxBuildHasher>,
     pub spot_oracle_prices: HashMap<u16, OraclePriceData, FxBuildHasher>,
     pub perp_oracle_prices: HashMap<u16, OraclePriceData, FxBuildHasher>,
+    pub spot_pyth_prices: HashMap<u16, i64, FxBuildHasher>, // Override spot with pyth price
+    pub perp_pyth_prices: HashMap<u16, i64, FxBuildHasher>, // Override perp with pyth price
+    pub pyth_oracle_diff_threshold_bps: u64, // Min bps diff to prefer pyth price over oracle. Defaults to 0 (always use pyth when set).
 }
 
 impl MarketState {
@@ -246,6 +249,30 @@ impl MarketState {
         self.perp_oracle_prices.get(&market_index).unwrap()
     }
 
+    pub fn get_spot_pyth_price(&self, market_index: u16) -> Option<OraclePriceData> {
+        self.spot_pyth_prices
+            .get(&market_index)
+            .map(|&price| OraclePriceData {
+                price,
+                confidence: 0,
+                delay: 0,
+                has_sufficient_number_of_data_points: true,
+                sequence_id: None,
+            })
+    }
+
+    pub fn get_perp_pyth_price(&self, market_index: u16) -> Option<OraclePriceData> {
+        self.perp_pyth_prices
+            .get(&market_index)
+            .map(|&price| OraclePriceData {
+                price,
+                confidence: 0,
+                delay: 0,
+                has_sufficient_number_of_data_points: true,
+                sequence_id: None,
+            })
+    }
+
     pub fn set_spot_market(&mut self, market: SpotMarket) {
         self.spot_markets.insert(market.market_index, market);
     }
@@ -260,5 +287,13 @@ impl MarketState {
 
     pub fn set_perp_oracle_price(&mut self, market_index: u16, price_data: OraclePriceData) {
         self.perp_oracle_prices.insert(market_index, price_data);
+    }
+
+    pub fn set_spot_pyth_price(&mut self, market_index: u16, price_data: i64) {
+        self.spot_pyth_prices.insert(market_index, price_data);
+    }
+
+    pub fn set_perp_pyth_price(&mut self, market_index: u16, price_data: i64) {
+        self.perp_pyth_prices.insert(market_index, price_data);
     }
 }

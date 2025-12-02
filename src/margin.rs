@@ -85,7 +85,19 @@ pub fn calculate_simplified_margin_requirement(
         }
 
         let spot_market = market_state.get_spot_market(spot_position.market_index);
-        let oracle_price = market_state.get_spot_oracle_price(spot_position.market_index);
+        let oracle_price = match market_state.get_spot_pyth_price(spot_position.market_index) {
+            Some(pyth_price) => {
+                let oracle = market_state.get_spot_oracle_price(spot_position.market_index);
+                let diff_bps = (pyth_price.price.abs_diff(oracle.price) * 10_000)
+                    / oracle.price.unsigned_abs();
+                if diff_bps > market_state.pyth_oracle_diff_threshold_bps {
+                    pyth_price
+                } else {
+                    *oracle
+                }
+            }
+            None => *market_state.get_spot_oracle_price(spot_position.market_index),
+        };
 
         let signed_token_amount = spot_position.get_signed_token_amount(spot_market).unwrap();
 
@@ -186,7 +198,19 @@ pub fn calculate_simplified_margin_requirement(
         }
 
         let perp_market = market_state.get_perp_market(perp_position.market_index);
-        let oracle_price = market_state.get_perp_oracle_price(perp_position.market_index);
+        let oracle_price = match market_state.get_perp_pyth_price(perp_position.market_index) {
+            Some(pyth_price) => {
+                let oracle = market_state.get_perp_oracle_price(perp_position.market_index);
+                let diff_bps = (pyth_price.price.abs_diff(oracle.price) * 10_000)
+                    / oracle.price.unsigned_abs();
+                if diff_bps > market_state.pyth_oracle_diff_threshold_bps {
+                    pyth_price
+                } else {
+                    *oracle
+                }
+            }
+            None => *market_state.get_perp_oracle_price(perp_position.market_index),
+        };
 
         let strict_quote_price = {
             let quote_price_data =
@@ -213,7 +237,7 @@ pub fn calculate_simplified_margin_requirement(
         ) = calculate_perp_position_value_and_pnl(
             perp_position,
             perp_market,
-            oracle_price,
+            &oracle_price,
             &strict_quote_price,
             margin_type,
             user_custom_margin_ratio.max(perp_position_custom_margin_ratio),
