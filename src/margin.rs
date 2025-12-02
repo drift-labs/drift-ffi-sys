@@ -90,7 +90,7 @@ pub fn calculate_simplified_margin_requirement(
                 let oracle = market_state.get_spot_oracle_price(spot_position.market_index);
                 let diff_bps = (pyth_price.price.abs_diff(oracle.price) * 10_000)
                     / oracle.price.unsigned_abs();
-                if diff_bps > 5 {
+                if diff_bps > market_state.pyth_oracle_diff_threshold_bps {
                     pyth_price
                 } else {
                     *oracle
@@ -203,7 +203,7 @@ pub fn calculate_simplified_margin_requirement(
                 let oracle = market_state.get_perp_oracle_price(perp_position.market_index);
                 let diff_bps = (pyth_price.price.abs_diff(oracle.price) * 10_000)
                     / oracle.price.unsigned_abs();
-                if diff_bps > 5 {
+                if diff_bps > market_state.pyth_oracle_diff_threshold_bps {
                     pyth_price
                 } else {
                     *oracle

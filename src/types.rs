@@ -229,6 +229,7 @@ pub struct MarketState {
     pub perp_oracle_prices: HashMap<u16, OraclePriceData, FxBuildHasher>,
     pub spot_pyth_prices: HashMap<u16, i64, FxBuildHasher>, // Override spot with pyth price
     pub perp_pyth_prices: HashMap<u16, i64, FxBuildHasher>, // Override perp with pyth price
+    pub pyth_oracle_diff_threshold_bps: u64, // Min bps diff to prefer pyth price over oracle. Defaults to 0 (always use pyth when set).
 }
 
 impl MarketState {
