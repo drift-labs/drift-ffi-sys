@@ -85,18 +85,21 @@ pub fn calculate_simplified_margin_requirement(
         }
 
         let spot_market = market_state.get_spot_market(spot_position.market_index);
-        let oracle_price = match market_state.get_spot_pyth_price(spot_position.market_index) {
-            Some(pyth_price) => {
-                let oracle = market_state.get_spot_oracle_price(spot_position.market_index);
-                let diff_bps = (pyth_price.price.abs_diff(oracle.price) * 10_000)
-                    / oracle.price.unsigned_abs();
+        let oracle = market_state.get_spot_oracle_price(spot_position.market_index);
+        let pyth = market_state.get_spot_pyth_price(spot_position.market_index);
+
+        let oracle_price = match pyth {
+            Some(p) if p.price != 0 && oracle.price == 0 => p,
+            Some(p) if p.price != 0 && oracle.price != 0 => {
+                let diff_bps =
+                    (p.price.abs_diff(oracle.price) * 10_000) / oracle.price.unsigned_abs();
                 if diff_bps > market_state.pyth_oracle_diff_threshold_bps {
-                    pyth_price
+                    p
                 } else {
                     *oracle
                 }
             }
-            None => *market_state.get_spot_oracle_price(spot_position.market_index),
+            _ => *oracle,
         };
 
         let signed_token_amount = spot_position.get_signed_token_amount(spot_market).unwrap();
@@ -198,18 +201,21 @@ pub fn calculate_simplified_margin_requirement(
         }
 
         let perp_market = market_state.get_perp_market(perp_position.market_index);
-        let oracle_price = match market_state.get_perp_pyth_price(perp_position.market_index) {
-            Some(pyth_price) => {
-                let oracle = market_state.get_perp_oracle_price(perp_position.market_index);
-                let diff_bps = (pyth_price.price.abs_diff(oracle.price) * 10_000)
-                    / oracle.price.unsigned_abs();
+        let oracle = market_state.get_perp_oracle_price(perp_position.market_index);
+        let pyth = market_state.get_perp_pyth_price(perp_position.market_index);
+
+        let oracle_price = match pyth {
+            Some(p) if p.price != 0 && oracle.price == 0 => p,
+            Some(p) if p.price != 0 && oracle.price != 0 => {
+                let diff_bps =
+                    (p.price.abs_diff(oracle.price) * 10_000) / oracle.price.unsigned_abs();
                 if diff_bps > market_state.pyth_oracle_diff_threshold_bps {
-                    pyth_price
+                    p
                 } else {
                     *oracle
                 }
             }
-            None => *market_state.get_perp_oracle_price(perp_position.market_index),
+            _ => *oracle,
         };
 
         let strict_quote_price = {
