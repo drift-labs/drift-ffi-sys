@@ -1053,7 +1053,7 @@ dependencies = [
 
 [[package]]
 name = "drift-ffi-sys"
-version = "2.150.0"
+version = "2.150.1"
 dependencies = [
  "abi_stable",
  "anchor-lang",
