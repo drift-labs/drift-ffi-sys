@@ -63,7 +63,7 @@ pub fn calculate_simplified_margin_requirement(
     market_state: &MarketState,
     margin_type: MarginRequirementType,
     margin_buffer: u32,
-) -> SimplifiedMarginCalculation {
+) -> Result<SimplifiedMarginCalculation, drift_program::error::ErrorCode> {
     let user_high_leverage_mode = user.is_high_leverage_mode(margin_type);
     let mut total_collateral = 0i128;
     let mut total_collateral_buffer = 0i128;
@@ -102,7 +102,7 @@ pub fn calculate_simplified_margin_requirement(
             _ => *oracle,
         };
 
-        let signed_token_amount = spot_position.get_signed_token_amount(spot_market).unwrap();
+        let signed_token_amount = spot_position.get_signed_token_amount(spot_market)?;
 
         let mut skip_token_value = false;
         if !(user.pool_id == 1 && spot_market.market_index == 0 && !spot_position.is_borrow()) {
@@ -153,14 +153,12 @@ pub fn calculate_simplified_margin_requirement(
                     &strict_oracle_price,
                     Some(signed_token_amount),
                     margin_type,
-                )
-                .unwrap()
+                )?
                 .apply_user_custom_margin_ratio(
                     spot_market,
                     strict_oracle_price.current,
                     user_custom_margin_ratio,
-                )
-                .unwrap();
+                )?;
 
             // Add open order margin requirement
             let open_order_margin = calculate_spot_open_order_margin(spot_position);
@@ -249,8 +247,7 @@ pub fn calculate_simplified_margin_requirement(
             user_custom_margin_ratio.max(perp_position_custom_margin_ratio),
             user_high_leverage_mode,
             false,
-        )
-        .unwrap();
+        )?;
 
         margin_requirement += perp_margin_requirement;
         margin_requirement_plus_buffer += perp_margin_requirement
@@ -263,12 +260,12 @@ pub fn calculate_simplified_margin_requirement(
         }
     }
 
-    SimplifiedMarginCalculation {
+    Ok(SimplifiedMarginCalculation {
         total_collateral,
         margin_requirement,
         total_collateral_buffer,
         margin_requirement_plus_buffer,
-    }
+    })
 }
 
 /// Incremental margin calculation
@@ -851,7 +848,8 @@ mod tests {
             &market_state,
             MarginRequirementType::Initial,
             0, // margin_buffer
-        );
+        )
+        .unwrap();
 
         assert!(result.free_collateral() > 0);
         assert!(!can_be_liquidated(&result));
@@ -974,7 +972,8 @@ mod tests {
             &market_state,
             MarginRequirementType::Initial,
             0, // margin_buffer
-        );
+        )
+        .unwrap();
 
         // Should have both asset and liability values
         assert!(result.margin_requirement > 0);
@@ -1286,7 +1285,8 @@ mod tests {
             &market_state,
             MarginRequirementType::Initial,
             100,
-        );
+        )
+        .unwrap();
 
         // Basic assertions
         assert!(calculation.total_collateral > 0);
@@ -1312,7 +1312,8 @@ mod tests {
             &market_state,
             MarginRequirementType::Initial,
             0,
-        );
+        )
+        .unwrap();
 
         // Should have some PnL (positive or negative) contributing to collateral calculation
         assert!(calculation.total_collateral > 0);
@@ -1339,7 +1340,8 @@ mod tests {
             &market_state,
             MarginRequirementType::Initial,
             0,
-        );
+        )
+        .unwrap();
 
         // Should have negative PnL requiring margin
         assert!(calculation.margin_requirement > 0);
@@ -1355,7 +1357,8 @@ mod tests {
             &market_state,
             MarginRequirementType::Maintenance,
             0, // margin_buffer
-        );
+        )
+        .unwrap();
 
         // Basic assertions for maintenance margin
         assert!(calculation.total_collateral > 0);
@@ -1491,7 +1494,8 @@ mod tests {
             &market_state,
             MarginRequirementType::Initial,
             0,
-        );
+        )
+        .unwrap();
 
         // Should use high leverage margin ratios (lower requirements)
         assert!(calculation.total_collateral > 0);
@@ -1520,7 +1524,8 @@ mod tests {
             &market_state,
             MarginRequirementType::Maintenance,
             0, // margin_buffer
-        );
+        )
+        .unwrap();
 
         // Should use high leverage margin ratios (lower requirements)
         assert!(calculation.total_collateral > 0);
@@ -1555,14 +1560,16 @@ mod tests {
             &market_state_hl,
             MarginRequirementType::Initial,
             0, // margin_buffer
-        );
+        )
+        .unwrap();
 
         let calculation_reg = calculate_simplified_margin_requirement(
             &user_reg,
             &market_state_reg,
             MarginRequirementType::Initial,
             0, // margin_buffer
-        );
+        )
+        .unwrap();
 
         // High leverage mode should have lower margin requirements
         assert!(calculation_hl.margin_requirement < calculation_reg.margin_requirement);
@@ -1592,7 +1599,8 @@ mod tests {
             &market_state,
             MarginRequirementType::Initial,
             100,
-        );
+        )
+        .unwrap();
 
         // Spot positions should be calculated normally (not affected by HLM)
         assert!(calculation.total_collateral > 0);
@@ -1610,7 +1618,8 @@ mod tests {
             &market_state,
             MarginRequirementType::Initial,
             0,
-        );
+        )
+        .unwrap();
 
         // Should use simple calculation (no worst-case simulation)
         assert!(calculation.total_collateral > 0);
@@ -1639,7 +1648,8 @@ mod tests {
             &market_state,
             MarginRequirementType::Initial,
             0,
-        );
+        )
+        .unwrap();
 
         // Should use worst-case fill simulation
         assert!(calculation.total_collateral > 0);
@@ -1668,7 +1678,8 @@ mod tests {
             &market_state,
             MarginRequirementType::Initial,
             0,
-        );
+        )
+        .unwrap();
 
         // Should use worst-case fill simulation for borrow
         assert!(calculation.total_collateral > 0);
@@ -1699,14 +1710,16 @@ mod tests {
             &market_state,
             MarginRequirementType::Initial,
             0, // margin_buffer
-        );
+        )
+        .unwrap();
 
         let calculation_maintenance = calculate_simplified_margin_requirement(
             &user,
             &market_state,
             MarginRequirementType::Maintenance,
             0,
-        );
+        )
+        .unwrap();
 
         // Initial margin should be higher due to custom margin ratio
         assert!(
@@ -1725,7 +1738,8 @@ mod tests {
             &market_state,
             MarginRequirementType::Initial,
             0, // margin_buffer
-        );
+        )
+        .unwrap();
 
         // Create identical user but with open orders set to 0 explicitly
         let user_with_orders = User {
@@ -1767,7 +1781,8 @@ mod tests {
             &market_state,
             MarginRequirementType::Initial,
             0, // margin_buffer
-        );
+        )
+        .unwrap();
 
         // Results should be identical
         assert_eq!(
@@ -1795,7 +1810,8 @@ mod tests {
             &market_state,
             MarginRequirementType::Maintenance,
             0, // margin_buffer
-        );
+        )
+        .unwrap();
 
         // Calculate using cached method
         let cached = IncrementalMarginCalculation::from_user(
@@ -1831,7 +1847,8 @@ mod tests {
             &market_state,
             MarginRequirementType::Maintenance,
             0, // margin_buffer
-        );
+        )
+        .unwrap();
 
         let cached = IncrementalMarginCalculation::from_user(
             &user,
@@ -1866,7 +1883,8 @@ mod tests {
             &market_state,
             MarginRequirementType::Maintenance,
             0, // margin_buffer
-        );
+        )
+        .unwrap();
 
         let cached = IncrementalMarginCalculation::from_user(
             &user,
@@ -1893,7 +1911,8 @@ mod tests {
             &market_state,
             MarginRequirementType::Maintenance,
             0, // margin_buffer
-        );
+        )
+        .unwrap();
 
         let cached = IncrementalMarginCalculation::from_user(
             &user,
@@ -1920,7 +1939,8 @@ mod tests {
             &market_state,
             MarginRequirementType::Maintenance,
             0, // margin_buffer
-        );
+        )
+        .unwrap();
 
         let cached = IncrementalMarginCalculation::from_user(
             &user,
@@ -1947,7 +1967,8 @@ mod tests {
             &market_state,
             MarginRequirementType::Maintenance,
             0, // margin_buffer
-        );
+        )
+        .unwrap();
 
         let cached = IncrementalMarginCalculation::from_user(
             &user,
@@ -1988,7 +2009,8 @@ mod tests {
             &market_state,
             MarginRequirementType::Maintenance,
             0, // margin_buffer
-        );
+        )
+        .unwrap();
 
         let cached = IncrementalMarginCalculation::from_user(
             &user,
@@ -2026,7 +2048,8 @@ mod tests {
             &market_state,
             MarginRequirementType::Maintenance,
             0, // margin_buffer
-        );
+        )
+        .unwrap();
 
         // Calculate with 1% margin buffer
         let calculation_with_buffer = calculate_simplified_margin_requirement(
@@ -2034,7 +2057,8 @@ mod tests {
             &market_state,
             MarginRequirementType::Maintenance,
             10_000, // 1% buffer (10_000 / MARGIN_PRECISION_U128 = 0.01)
-        );
+        )
+        .unwrap();
 
         // With buffer, margin requirement should be higher
         assert!(
