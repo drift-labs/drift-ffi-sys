@@ -463,7 +463,7 @@ pub extern "C" fn margin_calculate_simplified_margin_requirement(
         margin_buffer,
     );
 
-    FfiResult::ROk(result)
+    to_ffi_result(result)
 }
 
 #[no_mangle]
