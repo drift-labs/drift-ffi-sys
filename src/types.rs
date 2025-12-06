@@ -241,12 +241,12 @@ impl MarketState {
         self.perp_markets.get(&market_index).unwrap()
     }
 
-    pub fn get_spot_oracle_price(&self, market_index: u16) -> &OraclePriceData {
-        self.spot_oracle_prices.get(&market_index).unwrap()
+    pub fn get_spot_oracle_price(&self, market_index: u16) -> Option<&OraclePriceData> {
+        self.spot_oracle_prices.get(&market_index)
     }
 
-    pub fn get_perp_oracle_price(&self, market_index: u16) -> &OraclePriceData {
-        self.perp_oracle_prices.get(&market_index).unwrap()
+    pub fn get_perp_oracle_price(&self, market_index: u16) -> Option<&OraclePriceData> {
+        self.perp_oracle_prices.get(&market_index)
     }
 
     pub fn get_spot_pyth_price(&self, market_index: u16) -> Option<OraclePriceData> {

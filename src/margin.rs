@@ -85,7 +85,10 @@ pub fn calculate_simplified_margin_requirement(
         }
 
         let spot_market = market_state.get_spot_market(spot_position.market_index);
-        let oracle = market_state.get_spot_oracle_price(spot_position.market_index);
+        let oracle = market_state
+            .get_spot_oracle_price(spot_position.market_index)
+            .ok_or(drift_program::error::ErrorCode::OracleNotFound)?;
+
         let pyth = market_state.get_spot_pyth_price(spot_position.market_index);
 
         let oracle_price = match pyth {
@@ -199,7 +202,9 @@ pub fn calculate_simplified_margin_requirement(
         }
 
         let perp_market = market_state.get_perp_market(perp_position.market_index);
-        let oracle = market_state.get_perp_oracle_price(perp_position.market_index);
+        let oracle = market_state
+            .get_perp_oracle_price(perp_position.market_index)
+            .ok_or(drift_program::error::ErrorCode::OracleNotFound)?;
         let pyth = market_state.get_perp_pyth_price(perp_position.market_index);
 
         let oracle_price = match pyth {
@@ -217,8 +222,9 @@ pub fn calculate_simplified_margin_requirement(
         };
 
         let strict_quote_price = {
-            let quote_price_data =
-                market_state.get_spot_oracle_price(perp_market.quote_spot_market_index);
+            let quote_price_data = market_state
+                .get_spot_oracle_price(perp_market.quote_spot_market_index)
+                .ok_or(drift_program::error::ErrorCode::OracleNotFound)?;
             StrictOraclePrice {
                 current: quote_price_data.price,
                 twap_5min: None,
@@ -433,7 +439,7 @@ impl IncrementalMarginCalculation {
             .position(|c| c.market_index == spot_position.market_index && c.exists())
         {
             // Calculate new contribution and mutate in place
-            let new_collateral = calculate_spot_position_collateral(
+            if let Some(new_collateral) = calculate_spot_position_collateral(
                 spot_position,
                 market_state,
                 self.margin_type,
@@ -441,29 +447,29 @@ impl IncrementalMarginCalculation {
                 self.margin_buffer,
                 timestamp,
                 self.user_pool_id,
-            );
+            ) {
+                // Update the existing position in place
+                let old_collateral = &self.spot_collateral[pos];
 
-            // Update the existing position in place
-            let old_collateral = &self.spot_collateral[pos];
+                self.total_collateral -= old_collateral.collateral_value;
+                self.margin_requirement -= old_collateral.liability_value;
+                self.total_collateral_buffer -= old_collateral.collateral_buffer;
+                self.margin_requirement_plus_buffer -= old_collateral.liability_buffer;
 
-            self.total_collateral -= old_collateral.collateral_value;
-            self.margin_requirement -= old_collateral.liability_value;
-            self.total_collateral_buffer -= old_collateral.collateral_buffer;
-            self.margin_requirement_plus_buffer -= old_collateral.liability_buffer;
-
-            if spot_position.is_available() {
-                // removed
-                self.spot_collateral[pos] = Default::default();
-            } else {
-                self.total_collateral += new_collateral.collateral_value;
-                self.margin_requirement += new_collateral.liability_value;
-                self.total_collateral_buffer += new_collateral.collateral_buffer;
-                self.margin_requirement_plus_buffer += new_collateral.liability_buffer;
-                self.spot_collateral[pos] = new_collateral;
+                if spot_position.is_available() {
+                    // removed
+                    self.spot_collateral[pos] = Default::default();
+                } else {
+                    self.total_collateral += new_collateral.collateral_value;
+                    self.margin_requirement += new_collateral.liability_value;
+                    self.total_collateral_buffer += new_collateral.collateral_buffer;
+                    self.margin_requirement_plus_buffer += new_collateral.liability_buffer;
+                    self.spot_collateral[pos] = new_collateral;
+                }
             }
         } else if !spot_position.is_available() {
             // New position, calculate and add
-            let new_collateral = calculate_spot_position_collateral(
+            if let Some(new_collateral) = calculate_spot_position_collateral(
                 spot_position,
                 market_state,
                 self.margin_type,
@@ -471,20 +477,20 @@ impl IncrementalMarginCalculation {
                 self.margin_buffer,
                 timestamp,
                 self.user_pool_id,
-            );
+            ) {
+                // Add new contribution
+                self.total_collateral += new_collateral.collateral_value;
+                self.margin_requirement += new_collateral.liability_value;
+                self.total_collateral_buffer += new_collateral.collateral_buffer;
+                self.margin_requirement_plus_buffer +=
+                    new_collateral.liability_value + new_collateral.liability_buffer;
 
-            // Add new contribution
-            self.total_collateral += new_collateral.collateral_value;
-            self.margin_requirement += new_collateral.liability_value;
-            self.total_collateral_buffer += new_collateral.collateral_buffer;
-            self.margin_requirement_plus_buffer +=
-                new_collateral.liability_value + new_collateral.liability_buffer;
-
-            // insert position
-            if let Some(idx) = self.spot_collateral.iter().position(|x| {
-                x.last_updated == 0 && x.collateral_value == 0 && x.liability_value == 0
-            }) {
-                self.spot_collateral[idx] = new_collateral;
+                // insert position
+                if let Some(idx) = self.spot_collateral.iter().position(|x| {
+                    x.last_updated == 0 && x.collateral_value == 0 && x.liability_value == 0
+                }) {
+                    self.spot_collateral[idx] = new_collateral;
+                }
             }
         }
 
@@ -507,52 +513,52 @@ impl IncrementalMarginCalculation {
             // Remove old contribution
             let old_collateral = &self.perp_collateral[pos];
             // Calculate new contribution and mutate in place
-            let new_collateral = calculate_perp_position_collateral(
+            if let Some(new_collateral) = calculate_perp_position_collateral(
                 perp_position,
                 market_state,
                 self.margin_type,
                 self.user_high_leverage_mode,
                 self.margin_buffer,
                 timestamp,
-            );
+            ) {
+                self.total_collateral -= old_collateral.collateral_value;
+                self.margin_requirement -= old_collateral.liability_value;
+                self.total_collateral_buffer -= old_collateral.collateral_buffer;
+                self.margin_requirement_plus_buffer -= old_collateral.liability_buffer;
 
-            self.total_collateral -= old_collateral.collateral_value;
-            self.margin_requirement -= old_collateral.liability_value;
-            self.total_collateral_buffer -= old_collateral.collateral_buffer;
-            self.margin_requirement_plus_buffer -= old_collateral.liability_buffer;
-
-            if perp_position.is_available() {
-                // removed
-                self.perp_collateral[pos] = Default::default();
-            } else {
+                if perp_position.is_available() {
+                    // removed
+                    self.perp_collateral[pos] = Default::default();
+                } else {
+                    self.total_collateral += new_collateral.collateral_value;
+                    self.margin_requirement += new_collateral.liability_value;
+                    self.total_collateral_buffer += new_collateral.collateral_buffer;
+                    self.margin_requirement_plus_buffer += new_collateral.liability_buffer;
+                    self.perp_collateral[pos] = new_collateral;
+                }
+            }
+        } else if !perp_position.is_available() {
+            // New position, calculate and insert
+            if let Some(new_collateral) = calculate_perp_position_collateral(
+                perp_position,
+                market_state,
+                self.margin_type,
+                self.user_high_leverage_mode,
+                self.margin_buffer,
+                timestamp,
+            ) {
+                // Add new contribution
                 self.total_collateral += new_collateral.collateral_value;
                 self.margin_requirement += new_collateral.liability_value;
                 self.total_collateral_buffer += new_collateral.collateral_buffer;
                 self.margin_requirement_plus_buffer += new_collateral.liability_buffer;
-                self.perp_collateral[pos] = new_collateral;
-            }
-        } else if !perp_position.is_available() {
-            // New position, calculate and insert
-            let new_collateral = calculate_perp_position_collateral(
-                perp_position,
-                market_state,
-                self.margin_type,
-                self.user_high_leverage_mode,
-                self.margin_buffer,
-                timestamp,
-            );
 
-            // Add new contribution
-            self.total_collateral += new_collateral.collateral_value;
-            self.margin_requirement += new_collateral.liability_value;
-            self.total_collateral_buffer += new_collateral.collateral_buffer;
-            self.margin_requirement_plus_buffer += new_collateral.liability_buffer;
-
-            // insert position
-            if let Some(idx) = self.perp_collateral.iter().position(|x| {
-                x.last_updated == 0 && x.collateral_value == 0 && x.liability_value == 0
-            }) {
-                self.perp_collateral[idx] = new_collateral;
+                // insert position
+                if let Some(idx) = self.perp_collateral.iter().position(|x| {
+                    x.last_updated == 0 && x.collateral_value == 0 && x.liability_value == 0
+                }) {
+                    self.perp_collateral[idx] = new_collateral;
+                }
             }
         }
 
@@ -592,10 +598,10 @@ fn calculate_spot_position_collateral(
     margin_buffer: u32,
     timestamp: u64,
     user_pool_id: u8,
-) -> PositionCollateral {
+) -> Option<PositionCollateral> {
     let margin_buffer = margin_buffer as u128;
     let spot_market = market_state.get_spot_market(spot_position.market_index);
-    let oracle_price = market_state.get_spot_oracle_price(spot_position.market_index);
+    let oracle_price = market_state.get_spot_oracle_price(spot_position.market_index)?;
 
     // Create strict oracle price for worst-case simulation
     // in non-strict mode ignore twap (same as simplified calculation)
@@ -683,14 +689,14 @@ fn calculate_spot_position_collateral(
     let open_order_margin = calculate_spot_open_order_margin(spot_position);
     liability_value += open_order_margin;
 
-    PositionCollateral {
+    Some(PositionCollateral {
         market_index: spot_position.market_index,
         collateral_value,
         collateral_buffer: 0,
         liability_value,
         liability_buffer,
         last_updated: timestamp,
-    }
+    })
 }
 
 fn calculate_perp_position_collateral(
@@ -700,12 +706,13 @@ fn calculate_perp_position_collateral(
     user_high_leverage_mode: bool,
     margin_buffer: u32,
     timestamp: u64,
-) -> PositionCollateral {
+) -> Option<PositionCollateral> {
     let perp_market = market_state.get_perp_market(perp_position.market_index);
-    let oracle_price = market_state.get_perp_oracle_price(perp_position.market_index);
+    let oracle_price = market_state.get_perp_oracle_price(perp_position.market_index)?;
 
     // Get quote price for the perp market
-    let quote_oracle_data = market_state.get_spot_oracle_price(perp_market.quote_spot_market_index);
+    let quote_oracle_data =
+        market_state.get_spot_oracle_price(perp_market.quote_spot_market_index)?;
     let strict_quote_price = StrictOraclePrice {
         current: quote_oracle_data.price,
         twap_5min: None,
@@ -744,14 +751,14 @@ fn calculate_perp_position_collateral(
         collateral_buffer = (collateral_value * margin_buffer as i128) / MARGIN_PRECISION_I128;
     }
 
-    PositionCollateral {
+    Some(PositionCollateral {
         market_index: perp_position.market_index,
         collateral_value,
         collateral_buffer,
         liability_value,
         liability_buffer,
         last_updated: timestamp,
-    }
+    })
 }
 
 // Utility functions
