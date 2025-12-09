@@ -1,26 +1,61 @@
 // Simplified Margin Calculation System
-
-use std::cmp::Ordering;
-
 use drift_program::{
     math::{
+        casting::Cast,
         constants::{
             MARGIN_PRECISION_I128, MARGIN_PRECISION_U128, OPEN_ORDER_MARGIN_REQUIREMENT,
             QUOTE_SPOT_MARKET_INDEX,
         },
         margin::{calculate_perp_position_value_and_pnl, MarginRequirementType},
-        spot_balance::get_strict_token_value,
+        safe_math::SafeMath,
+        spot_balance::{get_strict_token_value, get_token_amount},
     },
     state::{
         oracle::StrictOraclePrice,
-        spot_market::SpotBalanceType,
+        perp_market::ContractTier,
+        spot_market::{AssetTier, SpotBalanceType},
         user::{OrderFillSimulation, PerpPosition, SpotPosition, User},
     },
 };
+use std::cmp::Ordering;
 
 // This is a mathematical abstraction of the Drift Protocol margin system
 // Reuses existing type definitions while removing Solana-specific abstractions
 use crate::types::MarketState;
+
+#[derive(Clone, Copy, Debug, Default)]
+pub struct IsolatedMarginCalculation {
+    pub market_index: u16,
+    pub margin_requirement: u128,
+    pub total_collateral: i128,
+    pub total_collateral_buffer: i128,
+    pub margin_requirement_plus_buffer: u128,
+}
+
+impl IsolatedMarginCalculation {
+    pub fn is_empty(&self) -> bool {
+        self.margin_requirement == 0 && self.total_collateral == 0
+    }
+
+    pub fn get_total_collateral_plus_buffer(&self) -> i128 {
+        self.total_collateral
+            .saturating_add(self.total_collateral_buffer)
+    }
+
+    pub fn meets_margin_requirement(&self) -> bool {
+        self.total_collateral >= self.margin_requirement as i128
+    }
+
+    pub fn meets_margin_requirement_with_buffer(&self) -> bool {
+        self.get_total_collateral_plus_buffer() >= self.margin_requirement_plus_buffer as i128
+    }
+
+    pub fn margin_shortage(&self) -> u128 {
+        (self.margin_requirement_plus_buffer as i128)
+            .saturating_sub(self.get_total_collateral_plus_buffer())
+            .max(0) as u128
+    }
+}
 
 // Core margin calculation result
 #[repr(C, align(16))]
@@ -30,6 +65,9 @@ pub struct SimplifiedMarginCalculation {
     pub total_collateral_buffer: i128,
     pub margin_requirement: u128,
     pub margin_requirement_plus_buffer: u128,
+    pub isolated_margin_calculations: [IsolatedMarginCalculation; 8],
+    pub with_perp_isolated_liability: bool,
+    pub with_spot_isolated_liability: bool,
 }
 
 impl SimplifiedMarginCalculation {
@@ -46,12 +84,61 @@ impl SimplifiedMarginCalculation {
         self.get_total_collateral_plus_buffer() - self.margin_requirement_plus_buffer as i128
     }
 
-    pub fn meets_margin_requirement(&self) -> bool {
+    pub fn meets_cross_margin_requirement(&self) -> bool {
         self.total_collateral >= self.margin_requirement as i128
     }
 
-    pub fn meets_margin_requirement_with_buffer(&self) -> bool {
+    pub fn meets_cross_margin_requirement_with_buffer(&self) -> bool {
         self.get_total_collateral_plus_buffer() >= self.margin_requirement_plus_buffer as i128
+    }
+
+    pub fn meets_margin_requirement(&self) -> bool {
+        if !self.meets_cross_margin_requirement() {
+            return false;
+        }
+        for calc in &self.isolated_margin_calculations {
+            if !calc.is_empty() && !calc.meets_margin_requirement() {
+                return false;
+            }
+        }
+        true
+    }
+
+    pub fn meets_margin_requirement_with_buffer(&self) -> bool {
+        if !self.meets_cross_margin_requirement_with_buffer() {
+            return false;
+        }
+        for calc in &self.isolated_margin_calculations {
+            if !calc.is_empty() && !calc.meets_margin_requirement_with_buffer() {
+                return false;
+            }
+        }
+        true
+    }
+
+    pub fn has_isolated_margin_calculation(&self, market_index: u16) -> bool {
+        self.isolated_margin_calculations
+            .iter()
+            .any(|c| c.market_index == market_index && !c.is_empty())
+    }
+
+    pub fn get_isolated_margin_calculation(
+        &self,
+        market_index: u16,
+    ) -> Option<&IsolatedMarginCalculation> {
+        self.isolated_margin_calculations
+            .iter()
+            .find(|c| c.market_index == market_index && !c.is_empty())
+    }
+
+    pub fn get_isolated_free_collateral(&self, market_index: u16) -> Option<i128> {
+        self.get_isolated_margin_calculation(market_index)
+            .map(|c| c.total_collateral - c.margin_requirement as i128)
+    }
+
+    pub fn meets_isolated_margin_requirement(&self, market_index: u16) -> Option<bool> {
+        self.get_isolated_margin_calculation(market_index)
+            .map(|c| c.meets_margin_requirement())
     }
 }
 
@@ -70,6 +157,10 @@ pub fn calculate_simplified_margin_requirement(
     let mut margin_requirement = 0u128;
     let mut margin_requirement_plus_buffer = 0u128;
     let margin_buffer = margin_buffer as u128;
+
+    let mut isolated_margin_calculations = [IsolatedMarginCalculation::default(); 8];
+    let mut with_perp_isolated_liability = false;
+    let mut with_spot_isolated_liability = false;
 
     // Get user's custom margin ratio (only applied for initial margin)
     let user_custom_margin_ratio = if margin_type == MarginRequirementType::Initial {
@@ -135,6 +226,10 @@ pub fn calculate_simplified_margin_requirement(
                     margin_requirement += liability_value;
                     margin_requirement_plus_buffer +=
                         liability_value + (liability_value * margin_buffer) / MARGIN_PRECISION_U128;
+
+                    if spot_market.asset_tier == AssetTier::Isolated {
+                        with_spot_isolated_liability = true;
+                    }
                 }
             }
         } else {
@@ -177,6 +272,10 @@ pub fn calculate_simplified_margin_requirement(
                     margin_requirement_plus_buffer += liability_value
                         + (worst_case_token_value.unsigned_abs() * margin_buffer)
                             / MARGIN_PRECISION_U128;
+
+                    if spot_market.asset_tier == AssetTier::Isolated {
+                        with_spot_isolated_liability = true;
+                    }
                 }
                 Ordering::Equal => {}
             }
@@ -190,6 +289,10 @@ pub fn calculate_simplified_margin_requirement(
                     margin_requirement += liability_value;
                     margin_requirement_plus_buffer +=
                         liability_value + (liability_value * margin_buffer) / MARGIN_PRECISION_U128;
+
+                    if spot_market.asset_tier == AssetTier::Isolated {
+                        with_spot_isolated_liability = true;
+                    }
                 }
                 Ordering::Equal => {}
             }
@@ -202,6 +305,7 @@ pub fn calculate_simplified_margin_requirement(
         }
 
         let perp_market = market_state.get_perp_market(perp_position.market_index);
+
         let oracle = market_state
             .get_perp_oracle_price(perp_position.market_index)
             .ok_or(drift_program::error::ErrorCode::OracleNotFound)?;
@@ -255,14 +359,74 @@ pub fn calculate_simplified_margin_requirement(
             false,
         )?;
 
-        margin_requirement += perp_margin_requirement;
-        margin_requirement_plus_buffer += perp_margin_requirement
-            + (worst_case_liability_value * margin_buffer) / MARGIN_PRECISION_U128;
+        if perp_position.is_isolated() {
+            let quote_spot_market =
+                market_state.get_spot_market(perp_market.quote_spot_market_index);
 
-        total_collateral += weighted_pnl;
-        if weighted_pnl < 0 {
-            total_collateral_buffer +=
-                (weighted_pnl * margin_buffer as i128) / MARGIN_PRECISION_I128;
+            let quote_token_amount = get_token_amount(
+                perp_position.isolated_position_scaled_balance as u128,
+                quote_spot_market,
+                &SpotBalanceType::Deposit,
+            )?;
+
+            let quote_token_value = get_strict_token_value(
+                quote_token_amount.cast::<i128>()?,
+                quote_spot_market.decimals,
+                &strict_quote_price,
+            )?;
+
+            let iso_total_collateral = quote_token_value.safe_add(weighted_pnl)?;
+
+            let iso_total_collateral_buffer = if margin_buffer > 0 && weighted_pnl < 0 {
+                weighted_pnl
+                    .safe_mul(margin_buffer.cast::<i128>()?)?
+                    .safe_div(MARGIN_PRECISION_I128)?
+            } else {
+                0
+            };
+
+            let iso_margin_requirement_plus_buffer = if margin_buffer > 0 {
+                perp_margin_requirement.safe_add(
+                    worst_case_liability_value
+                        .safe_mul(margin_buffer)?
+                        .safe_div(MARGIN_PRECISION_U128)?,
+                )?
+            } else {
+                0
+            };
+
+            if let Some(slot) = isolated_margin_calculations
+                .iter_mut()
+                .find(|c| c.is_empty())
+            {
+                *slot = IsolatedMarginCalculation {
+                    market_index: perp_position.market_index,
+                    margin_requirement: perp_margin_requirement,
+                    total_collateral: iso_total_collateral,
+                    total_collateral_buffer: iso_total_collateral_buffer,
+                    margin_requirement_plus_buffer: iso_margin_requirement_plus_buffer,
+                };
+            }
+
+            with_perp_isolated_liability = true;
+        } else {
+            margin_requirement += perp_margin_requirement;
+            margin_requirement_plus_buffer += perp_margin_requirement
+                + (worst_case_liability_value * margin_buffer) / MARGIN_PRECISION_U128;
+
+            total_collateral += weighted_pnl;
+            if weighted_pnl < 0 {
+                total_collateral_buffer +=
+                    (weighted_pnl * margin_buffer as i128) / MARGIN_PRECISION_I128;
+            }
+        }
+
+        let has_perp_liability = perp_position.base_asset_amount != 0
+            || perp_position.quote_asset_amount < 0
+            || perp_position.has_open_order();
+
+        if has_perp_liability && perp_market.contract_tier == ContractTier::Isolated {
+            with_perp_isolated_liability = true;
         }
     }
 
@@ -271,6 +435,9 @@ pub fn calculate_simplified_margin_requirement(
         margin_requirement,
         total_collateral_buffer,
         margin_requirement_plus_buffer,
+        isolated_margin_calculations,
+        with_perp_isolated_liability,
+        with_spot_isolated_liability,
     })
 }
 
@@ -572,6 +739,9 @@ impl IncrementalMarginCalculation {
             margin_requirement: self.margin_requirement,
             total_collateral_buffer: self.total_collateral_buffer,
             margin_requirement_plus_buffer: self.margin_requirement_plus_buffer,
+            isolated_margin_calculations: [IsolatedMarginCalculation::default(); 8],
+            with_perp_isolated_liability: false,
+            with_spot_isolated_liability: false,
         }
     }
 }
