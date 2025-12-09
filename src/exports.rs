@@ -131,7 +131,7 @@ pub extern "C" fn math_calculate_margin_requirement_and_total_collateral_and_lia
         total_spot_liability_value: m.total_spot_liability_value.into(),
         total_perp_liability_value: m.total_perp_liability_value.into(),
         total_perp_pnl: m.total_perp_pnl.into(),
-        open_orders_margin_requirement: m.open_orders_margin_requirement.into(),
+        isolated_margin_calculations: m.isolated_margin_calculations,
     });
 
     to_ffi_result(m)

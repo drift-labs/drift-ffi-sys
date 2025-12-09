@@ -1,12 +1,12 @@
 //! cross-boundary FFI types
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 
 use abi_stable::std_types::RResult;
 use drift_program::{
     controller::position::PositionDirection,
     math::{margin::MarginRequirementType, oracle::OracleValidity},
     state::{
-        margin_calculation::MarginContext,
+        margin_calculation::{IsolatedMarginCalculation, MarginContext},
         oracle::OraclePriceData,
         order_params::PostOnlyParam,
         perp_market::PerpMarket,
@@ -88,7 +88,7 @@ impl From<MarginContextMode> for MarginContext {
 }
 
 #[repr(C)]
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Clone, Debug)]
 pub struct MarginCalculation {
     pub total_collateral: compat::i128,
     pub margin_requirement: compat::u128,
@@ -98,7 +98,7 @@ pub struct MarginCalculation {
     pub total_spot_liability_value: compat::u128,
     pub total_perp_liability_value: compat::u128,
     pub total_perp_pnl: compat::i128,
-    pub open_orders_margin_requirement: compat::u128,
+    pub isolated_margin_calculations: BTreeMap<u16, IsolatedMarginCalculation>,
 }
 
 impl MarginCalculation {
@@ -198,7 +198,7 @@ pub mod compat {
     //! ffi compatible input types
 
     /// rust 1.76.0 ffi compatible i128
-    #[derive(Copy, Clone, Debug, PartialEq)]
+    #[derive(Copy, Clone, Debug, PartialEq, Default)]
     #[repr(C, align(16))]
     pub struct i128(pub std::primitive::i128);
 
@@ -209,7 +209,7 @@ pub mod compat {
     }
 
     /// rust 1.76.0 ffi compatible u128
-    #[derive(Copy, Clone, Debug, PartialEq)]
+    #[derive(Copy, Clone, Debug, PartialEq, Default)]
     #[repr(C, align(16))]
     pub struct u128(pub std::primitive::u128);
 
