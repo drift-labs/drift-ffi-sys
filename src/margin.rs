@@ -342,22 +342,16 @@ pub fn calculate_simplified_margin_requirement(
         };
 
         // Calculate unrealized PnL
-        let (
-            perp_margin_requirement,
-            weighted_pnl,
-            worst_case_liability_value,
-            _open_order_margin_requirement,
-            _base_asset_value,
-        ) = calculate_perp_position_value_and_pnl(
-            perp_position,
-            perp_market,
-            &oracle_price,
-            &strict_quote_price,
-            margin_type,
-            user_custom_margin_ratio.max(perp_position_custom_margin_ratio),
-            user_high_leverage_mode,
-            false,
-        )?;
+        let (perp_margin_requirement, weighted_pnl, worst_case_liability_value, _base_asset_value) =
+            calculate_perp_position_value_and_pnl(
+                perp_position,
+                perp_market,
+                &oracle_price,
+                &strict_quote_price,
+                margin_type,
+                user_custom_margin_ratio.max(perp_position_custom_margin_ratio),
+                user_high_leverage_mode,
+            )?;
 
         if perp_position.is_isolated() {
             let quote_spot_market =
@@ -889,23 +883,17 @@ fn calculate_perp_position_collateral(
     };
 
     // Use the same calculation as simplified version
-    let (
-        perp_margin_requirement,
-        weighted_pnl,
-        worst_case_liability_value,
-        _open_order_margin_requirement,
-        _base_asset_value,
-    ) = calculate_perp_position_value_and_pnl(
-        perp_position,
-        perp_market,
-        oracle_price,
-        &strict_quote_price,
-        margin_type,
-        0, // user_custom_margin_ratio - not used in cached version
-        user_high_leverage_mode,
-        false,
-    )
-    .unwrap();
+    let (perp_margin_requirement, weighted_pnl, worst_case_liability_value, _base_asset_value) =
+        calculate_perp_position_value_and_pnl(
+            perp_position,
+            perp_market,
+            oracle_price,
+            &strict_quote_price,
+            margin_type,
+            0, // user_custom_margin_ratio - not used in cached version
+            user_high_leverage_mode,
+        )
+        .unwrap();
 
     // Calculate margin buffer
     let mut collateral_buffer = 0i128;
