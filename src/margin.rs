@@ -1,13 +1,11 @@
 // Simplified Margin Calculation System
 use drift_program::{
     math::{
-        casting::Cast,
         constants::{
             MARGIN_PRECISION_I128, MARGIN_PRECISION_U128, OPEN_ORDER_MARGIN_REQUIREMENT,
             QUOTE_SPOT_MARKET_INDEX,
         },
         margin::{calculate_perp_position_value_and_pnl, MarginRequirementType},
-        safe_math::SafeMath,
         spot_balance::{get_strict_token_value, get_token_amount},
     },
     state::{
@@ -226,10 +224,6 @@ pub fn calculate_simplified_margin_requirement(
                     margin_requirement += liability_value;
                     margin_requirement_plus_buffer +=
                         liability_value + (liability_value * margin_buffer) / MARGIN_PRECISION_U128;
-
-                    if spot_market.asset_tier == AssetTier::Isolated {
-                        with_spot_isolated_liability = true;
-                    }
                 }
             }
         } else {
@@ -277,7 +271,13 @@ pub fn calculate_simplified_margin_requirement(
                         with_spot_isolated_liability = true;
                     }
                 }
-                Ordering::Equal => {}
+                Ordering::Equal => {
+                    if spot_position.has_open_order()
+                        && spot_market.asset_tier == AssetTier::Isolated
+                    {
+                        with_spot_isolated_liability = true;
+                    }
+                }
             }
 
             match worst_case_orders_value.cmp(&0) {
@@ -289,10 +289,6 @@ pub fn calculate_simplified_margin_requirement(
                     margin_requirement += liability_value;
                     margin_requirement_plus_buffer +=
                         liability_value + (liability_value * margin_buffer) / MARGIN_PRECISION_U128;
-
-                    if spot_market.asset_tier == AssetTier::Isolated {
-                        with_spot_isolated_liability = true;
-                    }
                 }
                 Ordering::Equal => {}
             }
@@ -364,27 +360,22 @@ pub fn calculate_simplified_margin_requirement(
             )?;
 
             let quote_token_value = get_strict_token_value(
-                quote_token_amount.cast::<i128>()?,
+                quote_token_amount as i128,
                 quote_spot_market.decimals,
                 &strict_quote_price,
             )?;
 
-            let iso_total_collateral = quote_token_value.safe_add(weighted_pnl)?;
+            let iso_total_collateral = quote_token_value + weighted_pnl;
 
             let iso_total_collateral_buffer = if margin_buffer > 0 && weighted_pnl < 0 {
-                weighted_pnl
-                    .safe_mul(margin_buffer.cast::<i128>()?)?
-                    .safe_div(MARGIN_PRECISION_I128)?
+                (weighted_pnl * margin_buffer as i128) / MARGIN_PRECISION_I128
             } else {
                 0
             };
 
             let iso_margin_requirement_plus_buffer = if margin_buffer > 0 {
-                perp_margin_requirement.safe_add(
-                    worst_case_liability_value
-                        .safe_mul(margin_buffer)?
-                        .safe_div(MARGIN_PRECISION_U128)?,
-                )?
+                perp_margin_requirement
+                    + (worst_case_liability_value * margin_buffer) / MARGIN_PRECISION_U128
             } else {
                 0
             };
@@ -2250,5 +2241,34 @@ mod tests {
             calculation_no_buffer.margin_requirement_plus_buffer,
             calculation_no_buffer.margin_requirement
         );
+    }
+
+    #[test]
+    fn test_isolated_perp_position() {
+        let (mut user, market_state) = create_simplified_test_setup();
+
+        user.perp_positions[0] = PerpPosition {
+            market_index: 0,
+            base_asset_amount: BASE_PRECISION_I64,
+            quote_asset_amount: -100 * QUOTE_PRECISION_I64,
+            isolated_position_scaled_balance: 50 * SPOT_BALANCE_PRECISION_U64,
+            position_flag: 0b00000001,
+            ..PerpPosition::default()
+        };
+
+        let calculation = calculate_simplified_margin_requirement(
+            &user,
+            &market_state,
+            MarginRequirementType::Initial,
+            0,
+        )
+        .unwrap();
+
+        assert!(calculation.has_isolated_margin_calculation(0));
+        assert!(calculation.with_perp_isolated_liability);
+
+        let iso_calc = calculation.get_isolated_margin_calculation(0).unwrap();
+        assert!(iso_calc.margin_requirement > 0);
+        assert!(iso_calc.total_collateral > 0);
     }
 }
