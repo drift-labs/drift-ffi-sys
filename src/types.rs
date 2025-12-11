@@ -6,7 +6,7 @@ use drift_program::{
     controller::position::PositionDirection,
     math::{margin::MarginRequirementType, oracle::OracleValidity},
     state::{
-        margin_calculation::{IsolatedMarginCalculation, MarginContext},
+        margin_calculation::MarginContext,
         oracle::OraclePriceData,
         order_params::PostOnlyParam,
         perp_market::PerpMarket,
@@ -98,7 +98,17 @@ pub struct MarginCalculation {
     pub total_spot_liability_value: compat::u128,
     pub total_perp_liability_value: compat::u128,
     pub total_perp_pnl: compat::i128,
-    pub isolated_margin_calculations: BTreeMap<u16, IsolatedMarginCalculation>,
+    pub isolated_margin_calculations: [IsolatedMarginCalculation; 8],
+}
+
+#[repr(C)]
+#[derive(Copy, Clone, Debug, Default)]
+pub struct IsolatedMarginCalculation {
+    pub market_index: u16,
+    pub margin_requirement: compat::u128,
+    pub total_collateral: compat::i128,
+    pub total_collateral_buffer: compat::i128,
+    pub margin_requirement_plus_buffer: compat::u128,
 }
 
 impl MarginCalculation {

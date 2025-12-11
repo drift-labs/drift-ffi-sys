@@ -1,7 +1,10 @@
 //!
 //! Define FFI for subset of drift program
 //!
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::{
+    collections::BTreeMap,
+    time::{SystemTime, UNIX_EPOCH},
+};
 
 use abi_stable::std_types::{
     ROption,
@@ -36,8 +39,8 @@ use crate::{
     margin::{IncrementalMarginCalculation, SimplifiedMarginCalculation},
     types::{
         compat::{self},
-        AccountsList, FfiResult, MMOraclePriceData, MarginCalculation, MarginContextMode,
-        MarketState,
+        AccountsList, FfiResult, IsolatedMarginCalculation, MMOraclePriceData, MarginCalculation,
+        MarginContextMode, MarketState,
     },
 };
 
@@ -122,18 +125,30 @@ pub extern "C" fn math_calculate_margin_requirement_and_total_collateral_and_lia
         margin_context.into(),
     );
 
-    let m = margin_calculation.map(|m| MarginCalculation {
-        total_collateral: m.total_collateral.into(),
-        margin_requirement: m.margin_requirement.into(),
-        with_perp_isolated_liability: m.with_perp_isolated_liability,
-        with_spot_isolated_liability: m.with_spot_isolated_liability,
-        total_spot_asset_value: m.total_spot_asset_value.into(),
-        total_spot_liability_value: m.total_spot_liability_value.into(),
-        total_perp_liability_value: m.total_perp_liability_value.into(),
-        total_perp_pnl: m.total_perp_pnl.into(),
-        isolated_margin_calculations: m.isolated_margin_calculations,
+    // map to ffi compatible u/i128s
+    let m = margin_calculation.map(|m| {
+        let mut isolated_margin_calculations = [IsolatedMarginCalculation::default(); 8];
+        for (idx, (k, v)) in m.isolated_margin_calculations.into_iter().enumerate() {
+            isolated_margin_calculations[idx] = IsolatedMarginCalculation {
+                market_index: k,
+                margin_requirement: v.margin_requirement.into(),
+                total_collateral: v.total_collateral.into(),
+                total_collateral_buffer: v.total_collateral_buffer.into(),
+                margin_requirement_plus_buffer: v.margin_requirement_plus_buffer.into(),
+            };
+        }
+        MarginCalculation {
+            total_collateral: m.total_collateral.into(),
+            margin_requirement: m.margin_requirement.into(),
+            with_perp_isolated_liability: m.with_perp_isolated_liability,
+            with_spot_isolated_liability: m.with_spot_isolated_liability,
+            total_spot_asset_value: m.total_spot_asset_value.into(),
+            total_spot_liability_value: m.total_spot_liability_value.into(),
+            total_perp_liability_value: m.total_perp_liability_value.into(),
+            total_perp_pnl: m.total_perp_pnl.into(),
+            isolated_margin_calculations,
+        }
     });
-
     to_ffi_result(m)
 }
 

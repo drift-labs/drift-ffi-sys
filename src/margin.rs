@@ -1,4 +1,6 @@
 // Simplified Margin Calculation System
+use std::cmp::Ordering;
+
 use drift_program::{
     math::{
         constants::{
@@ -15,7 +17,6 @@ use drift_program::{
         user::{OrderFillSimulation, PerpPosition, SpotPosition, User},
     },
 };
-use std::cmp::Ordering;
 
 // This is a mathematical abstraction of the Drift Protocol margin system
 // Reuses existing type definitions while removing Solana-specific abstractions
