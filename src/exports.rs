@@ -7,17 +7,21 @@ use abi_stable::std_types::{
     ROption,
     RResult::{RErr, ROk},
 };
+use anchor_lang::prelude::{AccountInfo, AccountLoader};
 use drift_program::{
-    math::{self, margin::MarginRequirementType},
+    controller::position::PositionDirection,
+    math::{self, amm::calculate_amm_available_liquidity, margin::MarginRequirementType},
     state::{
-        oracle::{get_oracle_price as get_oracle_price_, OracleSource},
+        oracle::{get_oracle_price as get_oracle_price_, OraclePriceData, OracleSource},
         oracle_map::OracleMap,
-        order_params::{OrderParams, PlaceOrderOptions},
+        order_params::PlaceOrderOptions,
         perp_market::{ContractType, PerpMarket},
         perp_market_map::PerpMarketMap,
+        protected_maker_mode_config::ProtectedMakerParams,
+        revenue_share::RevenueShareOrder,
         spot_market::SpotMarket,
         spot_market_map::SpotMarketMap,
-        state::State,
+        state::{State, ValidityGuardRails},
         user::{Order, PerpPosition, SpotPosition, User},
     },
 };
@@ -28,9 +32,13 @@ use solana_sdk::{
     pubkey::Pubkey,
 };
 
-use crate::types::{
-    compat::{self},
-    AccountsList, FfiResult, MarginCalculation, MarginContextMode, OraclePriceData,
+use crate::{
+    margin::{IncrementalMarginCalculation, SimplifiedMarginCalculation},
+    types::{
+        compat::{self},
+        AccountsList, FfiResult, MMOraclePriceData, MarginCalculation, MarginContextMode,
+        MarketState,
+    },
 };
 
 /// Return the FFI crate version
@@ -130,11 +138,13 @@ pub extern "C" fn math_calculate_margin_requirement_and_total_collateral_and_lia
 }
 
 #[no_mangle]
-pub extern "C" fn orders_place_perp_order(
+pub extern "C" fn orders_place_perp_order<'a>(
     user: &User,
     state: &State,
     order_params: &crate::types::OrderParams,
     accounts: &mut AccountsList,
+    high_leverage_mode_config: Option<&'a AccountInfo<'a>>,
+    revenue_share_order: &mut Option<&'a mut RevenueShareOrder>,
 ) -> FfiResult<bool> {
     let spot_accounts = accounts
         .spot_markets
@@ -164,7 +174,7 @@ pub extern "C" fn orders_place_perp_order(
     )
     .unwrap();
 
-    // has no epoch info but this is unrequired for orderplacement
+    // has no epoch info but this is un-required for order placement
     let local_clock = Clock {
         slot: accounts.latest_slot,
         epoch_start_timestamp: 0,
@@ -176,6 +186,8 @@ pub extern "C" fn orders_place_perp_order(
             .as_secs() as i64,
     };
 
+    let hlm_loader = high_leverage_mode_config
+        .map(|x| AccountLoader::try_from_unchecked(&drift_program::ID, x).unwrap());
     let res = drift_program::controller::orders::place_perp_order(
         state,
         &mut user.clone(),
@@ -183,35 +195,55 @@ pub extern "C" fn orders_place_perp_order(
         &perp_map,
         &spot_map,
         &mut oracle_map,
+        &hlm_loader,
         &local_clock,
-        drift_program::state::order_params::OrderParams {
-            order_type: order_params.order_type,
-            market_type: order_params.market_type,
-            direction: order_params.direction,
-            user_order_id: order_params.user_order_id,
-            base_asset_amount: order_params.base_asset_amount,
-            price: order_params.price,
-            market_index: order_params.market_index,
-            reduce_only: order_params.reduce_only,
-            post_only: order_params.post_only,
-            immediate_or_cancel: order_params.immediate_or_cancel,
-            max_ts: order_params.max_ts,
-            trigger_price: order_params.trigger_price,
-            trigger_condition: order_params.trigger_condition,
-            oracle_price_offset: order_params.oracle_price_offset,
-            auction_duration: order_params.auction_duration,
-            auction_start_price: order_params.auction_start_price,
-            auction_end_price: order_params.auction_end_price,
-        },
+        order_params.into(),
         PlaceOrderOptions::default(),
+        revenue_share_order,
     );
 
     to_ffi_result(res.map(|_| true))
 }
 
 #[no_mangle]
+pub extern "C" fn order_calculate_auction_params_for_trigger_order(
+    order: &Order,
+    oracle_price: &OraclePriceData,
+    perp_market: Option<&PerpMarket>,
+) -> FfiResult<(u8, i64, i64)> {
+    to_ffi_result(
+        drift_program::math::auction::calculate_auction_params_for_trigger_order(
+            order,
+            oracle_price,
+            20,
+            perp_market,
+        ),
+    )
+}
+
+#[no_mangle]
 pub extern "C" fn order_is_limit_order(order: &Order) -> bool {
     order.is_limit_order()
+}
+
+#[no_mangle]
+pub extern "C" fn order_get_limit_price(
+    order: &Order,
+    valid_oracle_price: Option<i64>,
+    fallback_price: Option<u64>,
+    slot: u64,
+    tick_size: u64,
+    is_prediction_market: bool,
+    pmm_params: Option<ProtectedMakerParams>,
+) -> FfiResult<Option<u64>> {
+    to_ffi_result(order.get_limit_price(
+        valid_oracle_price,
+        fallback_price,
+        slot,
+        tick_size,
+        is_prediction_market,
+        pmm_params,
+    ))
 }
 
 #[no_mangle]
@@ -221,12 +253,34 @@ pub extern "C" fn order_is_resting_limit_order(order: &Order, slot: u64) -> FfiR
 
 #[no_mangle]
 pub extern "C" fn order_params_will_auction_params_sanitize(
-    order_params: &mut OrderParams,
+    order_params: &crate::types::OrderParams,
     perp_market: &PerpMarket,
     oracle_price: i64,
     is_signed_msg: bool,
 ) -> FfiResult<bool> {
+    let mut order_params: drift_program::state::order_params::OrderParams = order_params.into();
     to_ffi_result(order_params.update_perp_auction_params(perp_market, oracle_price, is_signed_msg))
+}
+
+#[no_mangle]
+pub extern "C" fn order_params_update_perp_auction_params(
+    order_params: &mut crate::types::OrderParams,
+    perp_market: &PerpMarket,
+    oracle_price: i64,
+    is_signed_msg: bool,
+) {
+    // Convert to program type, update, then write back into the caller's struct
+    let mut order_params_2: drift_program::state::order_params::OrderParams =
+        (order_params as &crate::types::OrderParams).into();
+    order_params_2.update_perp_auction_params(perp_market, oracle_price, is_signed_msg);
+    *order_params = (&order_params_2).into();
+}
+
+#[no_mangle]
+pub extern "C" fn perp_market_get_protected_maker_params(
+    market: &PerpMarket,
+) -> ProtectedMakerParams {
+    market.get_protected_maker_params()
 }
 
 #[no_mangle]
@@ -247,6 +301,56 @@ pub extern "C" fn perp_market_get_margin_ratio(
 #[no_mangle]
 pub extern "C" fn perp_market_get_open_interest(market: &PerpMarket) -> compat::u128 {
     market.get_open_interest().into()
+}
+
+#[no_mangle]
+pub extern "C" fn perp_market_get_mm_oracle_price_data(
+    market: &PerpMarket,
+    oracle_price_data: OraclePriceData,
+    clock_slot: u64,
+    oracle_guard_rails: &ValidityGuardRails,
+) -> FfiResult<MMOraclePriceData> {
+    to_ffi_result(
+        market
+            .get_mm_oracle_price_data(oracle_price_data, clock_slot, oracle_guard_rails)
+            .map(|m| MMOraclePriceData {
+                mm_oracle_price: m._get_mm_oracle_price(),
+                mm_oracle_delay: m.get_mm_oracle_delay(),
+                mm_oracle_validity: m.get_mm_oracle_validity(),
+                // the alignment of this u128 is different across the abi boundary
+                mm_exchange_diff_bps: m.get_mm_exchange_diff_bps().into(),
+                exchange_oracle_price_data: m.get_exchange_oracle_price_data(),
+                safe_oracle_price_data: m.get_safe_oracle_price_data(),
+            }),
+    )
+}
+
+#[no_mangle]
+pub extern "C" fn perp_market_get_trigger_price(
+    market: &PerpMarket,
+    oracle_price: i64,
+    now: i64,
+    use_median_price: bool,
+) -> FfiResult<u64> {
+    to_ffi_result(market.get_trigger_price(oracle_price, now, use_median_price))
+}
+
+#[no_mangle]
+pub extern "C" fn perp_market_get_fallback_price(
+    market: &PerpMarket,
+    direction: PositionDirection,
+    oracle_price: i64,
+    seconds_til_order_expiry: i64,
+) -> FfiResult<u64> {
+    let res = match calculate_amm_available_liquidity(&market.amm, &direction) {
+        Ok(liq) => {
+            market
+                .amm
+                .get_fallback_price(&direction, liq, oracle_price, seconds_til_order_expiry)
+        }
+        Err(err) => Err(err),
+    };
+    to_ffi_result(res)
 }
 
 #[no_mangle]
@@ -275,15 +379,6 @@ pub extern "C" fn perp_position_worst_case_base_asset_amount(
 ) -> FfiResult<compat::i128> {
     let res = position.worst_case_base_asset_amount(oracle_price, contract_type);
     to_ffi_result(res.map(compat::i128))
-}
-
-#[no_mangle]
-pub extern "C" fn perp_position_simulate_settled_lp_position(
-    position: &PerpPosition,
-    market: &PerpMarket,
-    oracle_price: i64,
-) -> FfiResult<PerpPosition> {
-    to_ffi_result(position.simulate_settled_lp_position(market, oracle_price))
 }
 
 #[no_mangle]
@@ -348,6 +443,69 @@ pub extern "C" fn user_get_perp_position(
     market_index: u16,
 ) -> FfiResult<&PerpPosition> {
     to_ffi_result(user.get_perp_position(market_index))
+}
+
+#[no_mangle]
+pub extern "C" fn user_update_perp_position_max_margin_ratio(
+    user: &mut User,
+    market_index: u16,
+    margin_ratio: u16,
+) -> FfiResult<()> {
+    to_ffi_result(user.update_perp_position_max_margin_ratio(market_index, margin_ratio))
+}
+
+#[no_mangle]
+pub extern "C" fn margin_calculate_simplified_margin_requirement(
+    user: &User,
+    market_state: &MarketState,
+    margin_type: MarginRequirementType,
+    margin_buffer: u32,
+) -> FfiResult<SimplifiedMarginCalculation> {
+    let result = crate::margin::calculate_simplified_margin_requirement(
+        user,
+        market_state,
+        margin_type,
+        margin_buffer,
+    );
+
+    to_ffi_result(result)
+}
+
+#[no_mangle]
+pub extern "C" fn incremental_margin_calculation_from_user(
+    user: &User,
+    market_state: &MarketState,
+    margin_type: MarginRequirementType,
+    timestamp: u64,
+    margin_buffer: u32,
+) -> IncrementalMarginCalculation {
+    IncrementalMarginCalculation::from_user(
+        user,
+        market_state,
+        margin_type,
+        timestamp,
+        margin_buffer,
+    )
+}
+
+#[no_mangle]
+pub extern "C" fn incremental_margin_calculation_update_spot_position(
+    this: &mut IncrementalMarginCalculation,
+    spot_position: &SpotPosition,
+    market_state: &MarketState,
+    timestamp: u64,
+) {
+    this.update_spot_position(spot_position, market_state, timestamp);
+}
+
+#[no_mangle]
+pub extern "C" fn incremental_margin_calculation_update_perp_position(
+    this: &mut IncrementalMarginCalculation,
+    perp_position: &PerpPosition,
+    market_state: &MarketState,
+    timestamp: u64,
+) {
+    this.update_perp_position(perp_position, market_state, timestamp);
 }
 
 //
