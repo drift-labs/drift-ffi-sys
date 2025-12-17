@@ -284,6 +284,11 @@ pub extern "C" fn perp_market_get_protected_maker_params(
 }
 
 #[no_mangle]
+pub extern "C" fn order_triggered(order: &Order) -> bool {
+    order.triggered()
+}
+
+#[no_mangle]
 pub extern "C" fn perp_market_get_margin_ratio(
     market: &PerpMarket,
     size: compat::u128,
