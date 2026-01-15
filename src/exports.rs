@@ -13,7 +13,10 @@ use abi_stable::std_types::{
 use anchor_lang::prelude::{AccountInfo, AccountLoader};
 use drift_program::{
     controller::position::PositionDirection,
-    math::{self, amm::calculate_amm_available_liquidity, margin::MarginRequirementType},
+    math::{
+        self, amm::calculate_amm_available_liquidity, margin::MarginRequirementType,
+        orders::calculate_base_asset_amount_for_amm_to_fulfill,
+    },
     state::{
         oracle::{get_oracle_price as get_oracle_price_, OraclePriceData, OracleSource},
         oracle_map::OracleMap,
@@ -24,7 +27,7 @@ use drift_program::{
         revenue_share::RevenueShareOrder,
         spot_market::SpotMarket,
         spot_market_map::SpotMarketMap,
-        state::{State, ValidityGuardRails},
+        state::{FeeTier, State, ValidityGuardRails},
         user::{Order, PerpPosition, SpotPosition, User},
     },
 };
@@ -150,6 +153,26 @@ pub extern "C" fn math_calculate_margin_requirement_and_total_collateral_and_lia
         }
     });
     to_ffi_result(m)
+}
+
+#[no_mangle]
+pub extern "C" fn math_calculate_base_asset_amount_for_amm_to_fulfill(
+    order: &Order,
+    market: &PerpMarket,
+    limit_price: Option<u64>,
+    override_fill_price: Option<u64>,
+    existing_base_asset_amount: i64,
+    fee_tier: &FeeTier,
+) -> FfiResult<(u64, Option<u64>)> {
+    let res = drift_program::math::orders::calculate_base_asset_amount_for_amm_to_fulfill(
+        order,
+        market,
+        limit_price,
+        override_fill_price,
+        existing_base_asset_amount,
+        fee_tier,
+    );
+    to_ffi_result(res)
 }
 
 #[no_mangle]
@@ -296,6 +319,11 @@ pub extern "C" fn perp_market_get_protected_maker_params(
     market: &PerpMarket,
 ) -> ProtectedMakerParams {
     market.get_protected_maker_params()
+}
+
+#[no_mangle]
+pub extern "C" fn order_triggered(order: &Order) -> bool {
+    order.triggered()
 }
 
 #[no_mangle]
