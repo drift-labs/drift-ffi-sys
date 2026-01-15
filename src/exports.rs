@@ -1,10 +1,7 @@
 //!
 //! Define FFI for subset of drift program
 //!
-use std::{
-    collections::BTreeMap,
-    time::{SystemTime, UNIX_EPOCH},
-};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use abi_stable::std_types::{
     ROption,
@@ -13,10 +10,7 @@ use abi_stable::std_types::{
 use anchor_lang::prelude::{AccountInfo, AccountLoader};
 use drift_program::{
     controller::position::PositionDirection,
-    math::{
-        self, amm::calculate_amm_available_liquidity, margin::MarginRequirementType,
-        orders::calculate_base_asset_amount_for_amm_to_fulfill,
-    },
+    math::{self, amm::calculate_amm_available_liquidity, margin::MarginRequirementType},
     state::{
         oracle::{get_oracle_price as get_oracle_price_, OraclePriceData, OracleSource},
         oracle_map::OracleMap,

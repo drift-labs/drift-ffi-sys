@@ -1,5 +1,5 @@
 //! cross-boundary FFI types
-use std::collections::{BTreeMap, HashMap};
+use std::collections::HashMap;
 
 use abi_stable::std_types::RResult;
 use drift_program::{
