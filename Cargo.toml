@@ -1,6 +1,6 @@
 [package]
 name = "drift-ffi-sys"
-version = "2.153.1"
+version = "2.153.4"
 edition = "2021"
 description = "FFI bindings to drift program"
 
