@@ -9,7 +9,7 @@ use abi_stable::std_types::{
 };
 use anchor_lang::prelude::{AccountInfo, AccountLoader};
 use drift_program::{
-    controller::position::PositionDirection,
+    controller::{position::PositionDirection, repeg::_update_amm},
     math::{self, amm::calculate_amm_available_liquidity, margin::MarginRequirementType},
     state::{
         oracle::{get_oracle_price as get_oracle_price_, OraclePriceData, OracleSource},
@@ -147,6 +147,26 @@ pub extern "C" fn math_calculate_margin_requirement_and_total_collateral_and_lia
         }
     });
     to_ffi_result(m)
+}
+
+#[no_mangle]
+pub extern "C" fn simulate_update_amm(
+    market: &mut PerpMarket,
+    state: &State,
+    mm_oracle_price_data: MMOraclePriceData,
+    now: u64,
+    slot: Slot,
+) -> FfiResult<compat::i128> {
+    to_ffi_result(
+        _update_amm(
+            market,
+            &unsafe { std::mem::transmute(mm_oracle_price_data) },
+            state,
+            now as i64,
+            slot,
+        )
+        .map(|x| x.into()),
+    )
 }
 
 #[no_mangle]
