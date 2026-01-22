@@ -414,6 +414,19 @@ pub extern "C" fn perp_position_get_unrealized_pnl(
 }
 
 #[no_mangle]
+pub extern "C" fn perp_position_get_claimable_pnl(
+    position: &PerpPosition,
+    oracle_price: i64,
+    pnl_pool_excess: compat::i128,
+) -> FfiResult<compat::i128> {
+    to_ffi_result(
+        position
+            .get_claimable_pnl(oracle_price, pnl_pool_excess.0)
+            .map(compat::i128),
+    )
+}
+
+#[no_mangle]
 pub extern "C" fn perp_position_is_available(position: &PerpPosition) -> bool {
     position.is_available()
 }
