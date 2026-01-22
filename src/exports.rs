@@ -15,7 +15,7 @@ use drift_program::{
         oracle::{get_oracle_price as get_oracle_price_, OraclePriceData, OracleSource},
         oracle_map::OracleMap,
         order_params::PlaceOrderOptions,
-        perp_market::{ContractType, PerpMarket},
+        perp_market::{ContractType, PerpMarket, AMM},
         perp_market_map::PerpMarketMap,
         protected_maker_mode_config::ProtectedMakerParams,
         revenue_share::RevenueShareOrder,
@@ -147,6 +147,16 @@ pub extern "C" fn math_calculate_margin_requirement_and_total_collateral_and_lia
         }
     });
     to_ffi_result(m)
+}
+
+#[no_mangle]
+pub extern "C" fn math_calculate_net_user_pnl(
+    amm: &AMM,
+    oracle_price: i64,
+) -> FfiResult<compat::i128> {
+    to_ffi_result(
+        drift_program::math::amm::calculate_net_user_pnl(amm, oracle_price).map(compat::i128),
+    )
 }
 
 #[no_mangle]
