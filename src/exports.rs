@@ -19,7 +19,7 @@ use drift_program::{
         perp_market_map::PerpMarketMap,
         protected_maker_mode_config::ProtectedMakerParams,
         revenue_share::RevenueShareOrder,
-        spot_market::SpotMarket,
+        spot_market::{SpotBalanceType, SpotMarket},
         spot_market_map::SpotMarketMap,
         state::{FeeTier, State, ValidityGuardRails},
         user::{Order, PerpPosition, SpotPosition, User},
@@ -502,6 +502,18 @@ pub extern "C" fn spot_position_get_token_amount(
     market: &SpotMarket,
 ) -> FfiResult<compat::u128> {
     to_ffi_result(position.get_token_amount(market).map(compat::u128))
+}
+
+#[no_mangle]
+pub extern "C" fn spot_balance_get_token_amount(
+    balance: compat::u128,
+    spot_market: &SpotMarket,
+    balance_type: &SpotBalanceType,
+) -> FfiResult<compat::u128> {
+    to_ffi_result(
+        drift_program::math::spot_balance::get_token_amount(balance.0, spot_market, balance_type)
+            .map(compat::u128),
+    )
 }
 
 #[no_mangle]
