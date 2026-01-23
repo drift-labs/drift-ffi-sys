@@ -15,11 +15,11 @@ use drift_program::{
         oracle::{get_oracle_price as get_oracle_price_, OraclePriceData, OracleSource},
         oracle_map::OracleMap,
         order_params::PlaceOrderOptions,
-        perp_market::{ContractType, PerpMarket},
+        perp_market::{ContractType, PerpMarket, AMM},
         perp_market_map::PerpMarketMap,
         protected_maker_mode_config::ProtectedMakerParams,
         revenue_share::RevenueShareOrder,
-        spot_market::SpotMarket,
+        spot_market::{SpotBalanceType, SpotMarket},
         spot_market_map::SpotMarketMap,
         state::{FeeTier, State, ValidityGuardRails},
         user::{Order, PerpPosition, SpotPosition, User},
@@ -147,6 +147,16 @@ pub extern "C" fn math_calculate_margin_requirement_and_total_collateral_and_lia
         }
     });
     to_ffi_result(m)
+}
+
+#[no_mangle]
+pub extern "C" fn math_calculate_net_user_pnl(
+    amm: &AMM,
+    oracle_price: i64,
+) -> FfiResult<compat::i128> {
+    to_ffi_result(
+        drift_program::math::amm::calculate_net_user_pnl(amm, oracle_price).map(compat::i128),
+    )
 }
 
 #[no_mangle]
@@ -414,6 +424,19 @@ pub extern "C" fn perp_position_get_unrealized_pnl(
 }
 
 #[no_mangle]
+pub extern "C" fn perp_position_get_claimable_pnl(
+    position: &PerpPosition,
+    oracle_price: i64,
+    pnl_pool_excess: compat::i128,
+) -> FfiResult<compat::i128> {
+    to_ffi_result(
+        position
+            .get_claimable_pnl(oracle_price, pnl_pool_excess.0)
+            .map(compat::i128),
+    )
+}
+
+#[no_mangle]
 pub extern "C" fn perp_position_is_available(position: &PerpPosition) -> bool {
     position.is_available()
 }
@@ -479,6 +502,18 @@ pub extern "C" fn spot_position_get_token_amount(
     market: &SpotMarket,
 ) -> FfiResult<compat::u128> {
     to_ffi_result(position.get_token_amount(market).map(compat::u128))
+}
+
+#[no_mangle]
+pub extern "C" fn spot_balance_get_token_amount(
+    balance: compat::u128,
+    spot_market: &SpotMarket,
+    balance_type: &SpotBalanceType,
+) -> FfiResult<compat::u128> {
+    to_ffi_result(
+        drift_program::math::spot_balance::get_token_amount(balance.0, spot_market, balance_type)
+            .map(compat::u128),
+    )
 }
 
 #[no_mangle]
