@@ -22,6 +22,7 @@ use drift_program::{
 // Reuses existing type definitions while removing Solana-specific abstractions
 use crate::types::MarketState;
 
+#[repr(C, align(16))]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct IsolatedMarginCalculation {
     pub market_index: u16,
