@@ -22,13 +22,14 @@ use drift_program::{
 // Reuses existing type definitions while removing Solana-specific abstractions
 use crate::types::MarketState;
 
+#[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct IsolatedMarginCalculation {
-    pub market_index: u16,
     pub margin_requirement: u128,
     pub total_collateral: i128,
     pub total_collateral_buffer: i128,
     pub margin_requirement_plus_buffer: u128,
+    pub market_index: u16,
 }
 
 impl IsolatedMarginCalculation {
@@ -57,7 +58,7 @@ impl IsolatedMarginCalculation {
 }
 
 // Core margin calculation result
-#[repr(C, align(16))]
+#[repr(C)]
 #[derive(Debug, Clone)]
 pub struct SimplifiedMarginCalculation {
     pub total_collateral: i128,
