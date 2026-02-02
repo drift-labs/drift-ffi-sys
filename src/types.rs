@@ -104,11 +104,11 @@ pub struct MarginCalculation {
 #[repr(C)]
 #[derive(Copy, Clone, Debug, Default)]
 pub struct IsolatedMarginCalculation {
-    pub market_index: u16,
     pub margin_requirement: compat::u128,
     pub total_collateral: compat::i128,
     pub total_collateral_buffer: compat::i128,
     pub margin_requirement_plus_buffer: compat::u128,
+    pub market_index: u16,
 }
 
 impl MarginCalculation {
