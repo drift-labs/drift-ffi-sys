@@ -102,6 +102,18 @@ pub struct MarginCalculation {
 }
 
 #[repr(C)]
+#[derive(Debug, Clone)]
+pub struct SimplifiedMarginCalculation {
+    pub total_collateral: compat::i128,
+    pub total_collateral_buffer: compat::i128,
+    pub margin_requirement: compat::u128,
+    pub margin_requirement_plus_buffer: compat::u128,
+    pub isolated_margin_calculations: [IsolatedMarginCalculation; 8],
+    pub with_perp_isolated_liability: bool,
+    pub with_spot_isolated_liability: bool,
+}
+
+#[repr(C)]
 #[derive(Copy, Clone, Debug, Default)]
 pub struct IsolatedMarginCalculation {
     pub margin_requirement: compat::u128,
