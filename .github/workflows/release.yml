@@ -67,6 +67,7 @@ jobs:
         run: |
           rustup install 1.76.0
           rustup target add x86_64-apple-darwin --toolchain 1.76.0
+          rustup component add rust-std --target x86_64-apple-darwin --toolchain 1.76.0
       - name: Build Mac
         run: |
           cargo build --release --target x86_64-apple-darwin
