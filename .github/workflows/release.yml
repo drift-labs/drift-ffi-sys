@@ -4,7 +4,7 @@ on:
   # manual update
   push:
     tags:
-      - 'v*'
+      - "v*"
   # automated update
   workflow_run:
     workflows: ["Bump program version"]
@@ -25,7 +25,7 @@ jobs:
           echo "CARGO_VERSION=$(grep '^version = ' Cargo.toml | cut -d '"' -f2)" >> $GITHUB_ENV
 
       # For tag trigger: Check that tag matches Cargo.toml version
-      - name: Validate tag match for tag trigger 
+      - name: Validate tag match for tag trigger
         if: github.event_name == 'push'
         run: |
           TAG=${GITHUB_REF#refs/tags/v}
@@ -65,7 +65,7 @@ jobs:
 
       - name: Install ffi toolchain (1.76.0)
         run: |
- 	  rustup install stable
+          rustup install stable
           rustup target add 1.76.0-x86_64-apple-darwin
       - name: Build Mac
         run: |
