@@ -22,14 +22,13 @@ use drift_program::{
 // Reuses existing type definitions while removing Solana-specific abstractions
 use crate::types::MarketState;
 
-#[repr(C, align(16))]
 #[derive(Clone, Copy, Debug, Default)]
-pub struct IsolatedMarginCalculation {
-    pub market_index: u16,
+pub(crate) struct IsolatedMarginCalculation {
     pub margin_requirement: u128,
     pub total_collateral: i128,
     pub total_collateral_buffer: i128,
     pub margin_requirement_plus_buffer: u128,
+    pub market_index: u16,
 }
 
 impl IsolatedMarginCalculation {
@@ -57,10 +56,34 @@ impl IsolatedMarginCalculation {
     }
 }
 
+impl Into<crate::types::SimplifiedMarginCalculation> for SimplifiedMarginCalculation {
+    fn into(self) -> crate::types::SimplifiedMarginCalculation {
+        let mut isolated_margin_calculations =
+            [crate::types::IsolatedMarginCalculation::default(); 8];
+        for (idx, p) in self.isolated_margin_calculations.iter().enumerate() {
+            isolated_margin_calculations[idx] = crate::types::IsolatedMarginCalculation {
+                margin_requirement: p.margin_requirement.into(),
+                total_collateral: p.total_collateral.into(),
+                total_collateral_buffer: p.total_collateral_buffer.into(),
+                margin_requirement_plus_buffer: p.margin_requirement_plus_buffer.into(),
+                market_index: p.market_index,
+            };
+        }
+        crate::types::SimplifiedMarginCalculation {
+            total_collateral: self.total_collateral.into(),
+            total_collateral_buffer: self.total_collateral_buffer.into(),
+            margin_requirement: self.margin_requirement.into(),
+            margin_requirement_plus_buffer: self.margin_requirement_plus_buffer.into(),
+            isolated_margin_calculations,
+            with_perp_isolated_liability: self.with_perp_isolated_liability,
+            with_spot_isolated_liability: self.with_spot_isolated_liability,
+        }
+    }
+}
+
 // Core margin calculation result
-#[repr(C, align(16))]
 #[derive(Debug, Clone)]
-pub struct SimplifiedMarginCalculation {
+pub(crate) struct SimplifiedMarginCalculation {
     pub total_collateral: i128,
     pub total_collateral_buffer: i128,
     pub margin_requirement: u128,
@@ -726,7 +749,7 @@ impl IncrementalMarginCalculation {
             margin_requirement: self.margin_requirement,
             total_collateral_buffer: self.total_collateral_buffer,
             margin_requirement_plus_buffer: self.margin_requirement_plus_buffer,
-            isolated_margin_calculations: [IsolatedMarginCalculation::default(); 8],
+            isolated_margin_calculations: [Default::default(); 8],
             with_perp_isolated_liability: false,
             with_spot_isolated_liability: false,
         }

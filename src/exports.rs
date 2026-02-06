@@ -33,7 +33,7 @@ use solana_sdk::{
 };
 
 use crate::{
-    margin::{IncrementalMarginCalculation, SimplifiedMarginCalculation},
+    margin::IncrementalMarginCalculation,
     types::{
         compat::{self},
         AccountsList, FfiResult, IsolatedMarginCalculation, MMOraclePriceData, MarginCalculation,
@@ -547,7 +547,7 @@ pub extern "C" fn margin_calculate_simplified_margin_requirement(
     market_state: &MarketState,
     margin_type: MarginRequirementType,
     margin_buffer: u32,
-) -> FfiResult<SimplifiedMarginCalculation> {
+) -> FfiResult<crate::types::SimplifiedMarginCalculation> {
     let result = crate::margin::calculate_simplified_margin_requirement(
         user,
         market_state,
@@ -555,7 +555,7 @@ pub extern "C" fn margin_calculate_simplified_margin_requirement(
         margin_buffer,
     );
 
-    to_ffi_result(result)
+    to_ffi_result(result.map(Into::into))
 }
 
 #[no_mangle]
