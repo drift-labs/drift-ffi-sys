@@ -65,7 +65,7 @@ jobs:
 
       - name: Install ffi toolchain (1.76.0)
         run: |
-          rustup install 1.76.0-x86_64-apple-darwin
+          rustup install 1.76.0-x86_64-apple-darwin --force-non-host
           rustup default 1.76.0-x86_64-apple-darwin
       - name: Build Mac
         run: |
